@@ -942,7 +942,8 @@ const EMAIL_ALWAYS = [
   'sebastiano.bussalai@cbsc.it',
   'ignazio.lampis@cbsc.it',
   'pino.crisponi@cbsc.it',
-  'murrupaolo.pm@gmail.com'   // ← aggiunta per test
+  'murrupaolo.pm@gmail.com',
+  'cbscguasti@gmail.com'
 ];
 
 // Referente di zona
@@ -956,7 +957,7 @@ const EMAIL_ZONA = {
 const APP_URL = 'https://paolo728.github.io/CBSC-Guasti/';
 
 // Firebase
-const FB_PROJECT = 'cbsc-guasti';
+const FB_PROJECT = 'cbsc-guasti-a859b';
 const FB_BASE    = 'https://firestore.googleapis.com/v1/projects/' + FB_PROJECT + '/databases/(default)/documents';
 
 // Telegram
@@ -973,7 +974,7 @@ const TG_CHATS = {
 // Incolla qui l'URL del tuo Apps Script dopo averlo creato
 // (vedi istruzioni nel file README_SHEETS.txt allegato)
 // ════════════════════════════════════════
-const SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxxYmdDsSDP2ikUCfknSH_Eeu6WLqvFj4aCekQGU7gv25A1l63ZgAIRh6YuGjGPDB3p/exec';
+const SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzZHnvW9JkT9dMieI4ULcQr0X3DvDZftXFIWBT6ty-1SDPE24ugjf7kRfM7LcU_oN-H/exec';
 
 const ZONE_COLORS = {
   'MVT':         '#e63946',
@@ -1089,6 +1090,25 @@ function initApp() {
   });
 
   loadSegnalazioni();
+
+  // GPS automatico all'avvio
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      map.setView([lat, lng], 13);
+      if (!geoMarker) {
+        geoMarker = L.circleMarker([lat, lng], {
+          radius: 9, color: '#58a6ff', fillColor: '#58a6ff',
+          fillOpacity: 0.9, weight: 3
+        }).addTo(map);
+      }
+      geoActive = true;
+      document.getElementById('gps-btn').classList.add('active');
+      showToast('📍 Posizione rilevata', 'success');
+    }, function() {
+      // GPS negato o non disponibile, nessun messaggio
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+  }
 }
 
 // ════════════════════════════════════════
@@ -1189,13 +1209,26 @@ function inviaForm() {
   document.getElementById('sending-text').textContent = 'Salvataggio e invio notifiche...';
   document.getElementById('btn-send').classList.add('loading');
 
-  Promise.all([
-    saveToFirebase(seg),
-    sendTelegram(seg),
-  ]).then(function(results) {
+  // Converti foto in base64
+  var fotoPromises = fotoFiles.map(function(file) {
+    return new Promise(function(resolve) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        resolve({ name: file.name, type: file.type, data: e.target.result.split(',')[1] });
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  Promise.all(fotoPromises).then(function(fotosB64) {
+    seg.foto = fotosB64;
+    return Promise.all([
+      saveToFirebase(seg),
+      sendTelegram(seg),
+    ]);
+  }).then(function(results) {
     var fbId = results[0];
     seg.id = fbId;
-    // Invia a Google Sheets (non bloccante)
     sendToSheets(seg).catch(function(e) { console.warn('Sheets webhook error:', e); });
     document.getElementById('sending-overlay').classList.remove('show');
     showSuccess(seg);
@@ -1373,20 +1406,22 @@ function updateSegCount() {
 // GOOGLE SHEETS WEBHOOK
 // ════════════════════════════════════════
 async function sendToSheets(seg) {
-  if (!SHEETS_WEBHOOK_URL) return; // non configurato
+  if (!SHEETS_WEBHOOK_URL) return;
   var payload = {
-    id:                seg.id || '',
-    data_ora:          seg.timestamp_display || '',
-    zona:              seg.zona_label || seg.zona || '',
-    tipo:              seg.tipo || '',
-    priorita:          seg.priorita || '',
-    descrizione:       seg.descrizione || '',
-    segnalato_da:      seg.segnalato_da || '',
-    lat:               seg.lat ? String(seg.lat) : '',
-    lng:               seg.lng ? String(seg.lng) : '',
-    stato:             seg.stato || 'APERTO',
-    maps_url:          seg.lat ? 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng : '',
-    _action:           seg._action || 'insert'
+    id:           seg.id || '',
+    data_ora:     seg.timestamp_display || '',
+    zona:         seg.zona_label || seg.zona || '',
+    zona_key:     seg.zona || '',
+    tipo:         seg.tipo || '',
+    priorita:     seg.priorita || '',
+    descrizione:  seg.descrizione || '',
+    segnalato_da: seg.segnalato_da || '',
+    lat:          seg.lat ? String(seg.lat) : '',
+    lng:          seg.lng ? String(seg.lng) : '',
+    stato:        seg.stato || 'APERTO',
+    maps_url:     seg.lat ? 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng : '',
+    foto:         seg.foto || [],
+    _action:      seg._action || 'insert'
   };
   await fetch(SHEETS_WEBHOOK_URL, {
     method: 'POST',
@@ -1597,12 +1632,22 @@ function renderStats(docs, activeCount) {
     return;
   }
 
+  // Colori sfumati per mese (stessa tonalità blu-verde con variazioni)
+  var monthColors = [
+    '#1a6b8a','#1e7d9e','#2290b3','#26a2c7', // Gen-Apr (blu freddo)
+    '#2ab5db','#2ec8ef','#32dafa','#53e2fb',  // Mag-Ago (azzurro)
+    '#74eafc','#95f2fd','#b6f9fe','#d7ffff'  // Set-Dic (azzurro chiaro)
+  ];
+
   html += '<div class="stats-section"><h3>Segnalazioni per mese — ' + thisYear + '</h3><div class="bar-chart">';
   months.forEach(function(m, i) {
     var pct   = Math.round(monthCounts[i] / maxMonth * 100);
-    var color = i === thisMonth ? 'var(--red)' : 'var(--accent)';
-    html += '<div class="bar-row"><span class="bar-label">' + m + '</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + color + '">' +
+    var color = i === thisMonth ? '#e63946' : monthColors[i];
+    var isCurrentMonth = i === thisMonth;
+    html += '<div class="bar-row">' +
+      '<span class="bar-label" style="' + (isCurrentMonth ? 'color:var(--text);font-weight:700' : '') + '">' + m + '</span>' +
+      '<div class="bar-track">' +
+      '<div class="bar-fill" style="width:' + (pct || 0) + '%;background:' + color + ';min-width:' + (monthCounts[i]>0?'28px':'0') + '">' +
       (monthCounts[i] > 0 ? '<span class="bar-val">' + monthCounts[i] + '</span>' : '') +
       '</div></div></div>';
   });
