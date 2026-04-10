@@ -923,17 +923,14 @@ textarea{resize:none;min-height:90px;}
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
 <script>
 
 // ════════════════════════════════════════════
 // CONFIGURAZIONE
 // ════════════════════════════════════════════
 
-// EmailJS
-const EMAILJS_PUBLIC_KEY  = 'IUlnwDU-T-fiy_0Q9';
-const EMAILJS_SERVICE_ID  = 'service_ljfzmwn';
-const EMAILJS_TEMPLATE_ID = 'template_1cewvru';
+// Email gestita tramite Google Apps Script (webhook Sheets)
 
 // Destinatari email sempre in copia
 const EMAIL_ALWAYS = [
@@ -1063,7 +1060,7 @@ var map, miniMap, miniMarker, selectedLat, selectedLng, selectedZona;
 var segMarkers = {};
 var geoActive = false, geoWatch = null, geoMarker = null;
 
-emailjs.init(EMAILJS_PUBLIC_KEY);
+
 
 function initApp() {
   map = L.map('map', { zoomControl: true, maxZoom: 18 }).setView([40.4, 9.3], 9);
@@ -1190,7 +1187,6 @@ function inviaForm() {
   Promise.all([
     saveToFirebase(seg),
     sendTelegram(seg),
-    sendEmails(seg),
   ]).then(function(results) {
     var fbId = results[0];
     seg.id = fbId;
@@ -1395,46 +1391,7 @@ async function sendToSheets(seg) {
   });
 }
 
-// ════════════════════════════════════════
-// EMAIL
-// ════════════════════════════════════════
-async function sendEmails(seg) {
-  var prioEmoji  = seg.priorita === 'ALTA' ? '🔴' : seg.priorita === 'MEDIA' ? '🟡' : '🟢';
-  var bannerColor = seg.priorita === 'ALTA' ? '#e63946' : seg.priorita === 'MEDIA' ? '#f0883e' : '#3fb950';
-  var mapsUrl = 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng;
-  var appUrl  = APP_URL + '?seg=' + (seg.id || '');
-
-  var recipients = EMAIL_ALWAYS.slice();
-  if (seg.zona && EMAIL_ZONA[seg.zona]) {
-    var zonaEmail = EMAIL_ZONA[seg.zona];
-    if (recipients.indexOf(zonaEmail) === -1) recipients.push(zonaEmail);
-  }
-
-  var templateParams = {
-    to_email:         recipients.join(','),
-    tipo:             seg.tipo,
-    priorita:         seg.priorita,
-    priorita_emoji:   prioEmoji,
-    banner_color:     bannerColor,
-    zona_label:       seg.zona_label,
-    descrizione:      seg.descrizione,
-    segnalato_da:     seg.segnalato_da,
-    timestamp_display: seg.timestamp_display,
-    lat:              seg.lat ? seg.lat.toFixed(5) : '—',
-    lng:              seg.lng ? seg.lng.toFixed(5) : '—',
-    maps_url:         mapsUrl,
-    app_url:          appUrl
-  };
-
-  try {
-    var result = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
-    console.log('✅ Email inviata. Status:', result.status, '— A:', recipients.join(', '));
-  } catch(e) {
-    console.error('❌ EmailJS error:', JSON.stringify(e));
-    // Non blocca il flusso ma lo segnaliamo
-    showToast('⚠️ Email non inviata (vedi console)', 'error');
-  }
-}
+// Email inviate tramite Google Apps Script webhook (vedi sendToSheets)
 
 // ════════════════════════════════════════
 // TELEGRAM
