@@ -1531,7 +1531,8 @@ async function loadSegnalazioni() {
           lng:               f.lng?.doubleValue || 0,
           timestamp_display: f.timestamp_display?.stringValue || '',
           stato:             f.stato?.stringValue || 'APERTO',
-          ttl:               parseInt(f.ttl?.integerValue || '0')
+          ttl:               parseInt(f.ttl?.integerValue || '0'),
+          foto_links:        f.foto_links?.stringValue || ''
         };
         if (seg.ttl && Date.now() > seg.ttl) return;
         addMarkerToMap(seg);
@@ -1577,6 +1578,20 @@ function addMarkerToMap(seg) {
 
   var btnPDF = '<button onclick="stampaPDF(\'' + seg.id + '\')" style="margin-top:6px;width:100%;padding:6px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;font-size:12px;font-weight:700;cursor:pointer">Esporta PDF</button>';
 
+  // Sezione foto nel popup
+  var fotoHtml = '';
+  if (seg.foto_links) {
+    var links = seg.foto_links.split(' | ').filter(function(l) { return l.trim(); });
+    if (links.length > 0) {
+      fotoHtml = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #30363d">' +
+        '<div style="font-size:10px;color:#8b949e;margin-bottom:4px">FOTO ALLEGATE</div>';
+      links.forEach(function(link, i) {
+        fotoHtml += '<a href="' + link + '" target="_blank" style="display:inline-block;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;color:#58a6ff;padding:3px 8px;border-radius:4px;font-size:11px;text-decoration:none;margin-right:4px;margin-bottom:4px">📷 Foto ' + (i+1) + '</a>';
+      });
+      fotoHtml += '</div>';
+    }
+  }
+
   marker.bindPopup(
     '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px;min-width:200px">' +
     '<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:#58a6ff;margin-bottom:6px">' + (seg.codice || 'N/D') + '</div>' +
@@ -1585,10 +1600,11 @@ function addMarkerToMap(seg) {
     '<div style="color:#8b949e;font-size:11px;margin-bottom:2px">' + seg.zona_label + '</div>' +
     '<div style="color:#8b949e;font-size:11px;margin-bottom:6px">' + seg.timestamp_display + '</div>' +
     '<div style="font-size:12px;color:#c9d1d9">' + seg.descrizione.substring(0,80) + '</div>' +
+    fotoHtml +
     btnChiudi +
     btnPDF +
     '</div>'
-  , { maxWidth: 260 });
+  , { maxWidth: 280 });
 
   clusterGroup.addLayer(marker);
   segMarkers[seg.id] = marker;
