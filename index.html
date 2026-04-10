@@ -1687,7 +1687,6 @@ async function sendToSheets(seg) {
   var payload = {
     codice:       seg.codice || '',
     id:           seg.id || '',
-    codice:       seg.codice || '',
     data_ora:     seg.timestamp_display || '',
     zona:         seg.zona_label || seg.zona || '',
     zona_key:     seg.zona || '',
@@ -1702,6 +1701,7 @@ async function sendToSheets(seg) {
     foto:         seg.foto || [],
     _action:      seg._action || 'insert'
   };
+  console.log('sendToSheets payload zona_key:', payload.zona_key, 'zona:', payload.zona);
   await fetch(SHEETS_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
