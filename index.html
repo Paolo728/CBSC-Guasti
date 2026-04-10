@@ -615,6 +615,18 @@ textarea{resize:none;min-height:90px;}
 }
 .btn-chiudi-intervento:hover { background: rgba(210,153,34,0.2); }
 
+.btn-pdf-intervento {
+  flex: 1; padding: 8px;
+  background: rgba(88,166,255,0.1);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-pdf-intervento:hover { background: rgba(88,166,255,0.2); }
+
 .interventi-empty {
   text-align: center; padding: 60px 20px;
   color: var(--text3); font-size: 14px;
@@ -853,6 +865,9 @@ textarea{resize:none;min-height:90px;}
   </div>
   <button class="login-btn" onclick="doLogin()">ACCEDI</button>
   <div class="login-err" id="login-err">Credenziali non valide</div>
+  <div style="position:fixed;bottom:16px;right:16px;font-size:10px;color:var(--text3);text-align:right;line-height:1.4">
+    Sviluppato da<br><strong style="color:var(--text2)">Paolo Murru</strong>
+  </div>
 </div>
 
 <!-- APP -->
@@ -1004,6 +1019,13 @@ textarea{resize:none;min-height:90px;}
     <button class="interventi-close" onclick="closeInterventi()">✕</button>
   </div>
   <div class="interventi-body" id="interventi-body">
+    <!-- Barra ricerca -->
+    <div style="margin-bottom:12px;position:relative">
+      <input type="text" id="search-codice" placeholder="Cerca per codice (es. 20260410-1234)..."
+        oninput="cercaPerCodice(this.value)"
+        style="width:100%;padding:10px 14px 10px 36px;background:var(--dark3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;outline:none">
+      <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--text2);fill:none" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </div>
     <div class="interventi-filter">
       <button class="filter-btn active" id="f-tutti" onclick="filterInterventi('tutti')">Tutti</button>
       <button class="filter-btn" id="f-aperti" onclick="filterInterventi('aperti')">Aperti</button>
@@ -1066,6 +1088,35 @@ textarea{resize:none;min-height:90px;}
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<style>
+/* Cluster personalizzato CBSC */
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+  background-clip: padding-box;
+}
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+  width: 36px; height: 36px;
+  margin: 2px;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 36px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px; font-weight: 700;
+  color: white;
+}
+.marker-cluster-small { background-color: rgba(230,57,70,0.2); }
+.marker-cluster-small div { background-color: rgba(230,57,70,0.8); }
+.marker-cluster-medium { background-color: rgba(240,136,62,0.2); }
+.marker-cluster-medium div { background-color: rgba(240,136,62,0.8); }
+.marker-cluster-large { background-color: rgba(88,166,255,0.2); }
+.marker-cluster-large div { background-color: rgba(88,166,255,0.8); }
+</style>
 
 <script>
 
@@ -1202,6 +1253,7 @@ function getZonaForPoint(lng, lat) {
 // ════════════════════════════════════════
 var map, miniMap, miniMarker, selectedLat, selectedLng, selectedZona;
 var segMarkers = {};
+var clusterGroup = null;
 var geoActive = false, geoWatch = null, geoMarker = null;
 
 
@@ -1211,6 +1263,29 @@ function initApp() {
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: '© Esri', maxZoom: 18
   }).addTo(map);
+
+  // Cluster group per i marker
+  clusterGroup = L.markerClusterGroup({
+    maxClusterRadius: 60,
+    showCoverageOnHover: false,
+    zoomToBoundsOnClick: true,
+    spiderfyOnMaxZoom: true,
+    disableClusteringAtZoom: 16,
+    iconCreateFunction: function(cluster) {
+      var markers = cluster.getAllChildMarkers();
+      var hasAlta = markers.some(function(m) { return m._segData && m._segData.priorita === 'ALTA' && m._segData.stato !== 'RISOLTO'; });
+      var hasMedia = markers.some(function(m) { return m._segData && m._segData.priorita === 'MEDIA' && m._segData.stato !== 'RISOLTO'; });
+      var color = hasAlta ? '#e63946' : hasMedia ? '#f0883e' : '#3fb950';
+      var count = cluster.getChildCount();
+      return L.divIcon({
+        html: '<div style="width:40px;height:40px;border-radius:50%;background:' + color + ';border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:700;color:white">' + count + '</div>',
+        className: '',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      });
+    }
+  });
+  map.addLayer(clusterGroup);
 
   for (var zoneName in ZONE_DATA) {
     (function(zn) {
@@ -1486,7 +1561,7 @@ function addMarkerToMap(seg) {
     });
   }
 
-  var marker = L.marker([seg.lat, seg.lng], { icon: buildIcon(map.getZoom() >= 14) }).addTo(map);
+  var marker = L.marker([seg.lat, seg.lng], { icon: buildIcon(false) });
 
   var prioBadge = '<span style="background:' + color + ';color:white;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">' + (seg.priorita||'') + '</span>';
   var statoBadge = seg.stato === 'RISOLTO'
@@ -1497,6 +1572,8 @@ function addMarkerToMap(seg) {
     ? '<button onclick="richiesPinChiusura(\'' + seg.id + '\')" style="margin-top:8px;width:100%;padding:6px;background:#d29922;border:none;border-radius:6px;color:#0d1117;font-size:12px;font-weight:700;cursor:pointer">Chiudi intervento</button>'
     : '<div style="color:#3fb950;font-size:12px;margin-top:6px;text-align:center">Intervento chiuso</div>';
 
+  var btnPDF = '<button onclick="stampaPDF(\'' + seg.id + '\')" style="margin-top:6px;width:100%;padding:6px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;font-size:12px;font-weight:700;cursor:pointer">Esporta PDF</button>';
+
   marker.bindPopup(
     '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px;min-width:200px">' +
     '<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:#58a6ff;margin-bottom:6px">' + (seg.codice || 'N/D') + '</div>' +
@@ -1506,12 +1583,23 @@ function addMarkerToMap(seg) {
     '<div style="color:#8b949e;font-size:11px;margin-bottom:6px">' + seg.timestamp_display + '</div>' +
     '<div style="font-size:12px;color:#c9d1d9">' + seg.descrizione.substring(0,80) + '</div>' +
     btnChiudi +
+    btnPDF +
     '</div>'
   , { maxWidth: 260 });
 
+  clusterGroup.addLayer(marker);
   segMarkers[seg.id] = marker;
   marker._segData = seg;
   marker._buildIcon = buildIcon;
+  marker._color = color;
+
+  // Aggiorna icona con etichetta quando zoom >= 16 (clustering disabilitato)
+  map.on('zoomend', function() {
+    if (segMarkers[seg.id] && marker._buildIcon) {
+      var showLabel = map.getZoom() >= 16;
+      marker.setIcon(marker._buildIcon(showLabel));
+    }
+  });
 }
 
 // ── PIN CHIUSURA ──
@@ -1552,13 +1640,18 @@ async function risolviSegnalazione(id) {
     });
     map.closePopup();
     if (segMarkers[id]) {
+      var m = segMarkers[id];
+      m._segData.stato = 'RISOLTO';
+      // Rigenera icona verde
       var newIcon = L.divIcon({
         className: '',
-        html: '<div style="width:20px;height:20px;background:#3fb950;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>',
-        iconSize: [20,20], iconAnchor: [10,10]
+        html: '<div style="display:flex;flex-direction:column;align-items:center">' +
+              '<div style="width:20px;height:20px;background:#3fb950;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div></div>',
+        iconSize: [20, 20], iconAnchor: [10, 10]
       });
-      segMarkers[id].setIcon(newIcon);
-      if (segMarkers[id]._segData) segMarkers[id]._segData.stato = 'RISOLTO';
+      m.setIcon(newIcon);
+      // Forza refresh cluster
+      clusterGroup.refreshClusters(m);
     }
     showToast('Intervento ' + (segMarkers[id]?._segData?.codice || '') + ' chiuso', 'success');
     var segData = segMarkers[id]?._segData || {};
@@ -1590,6 +1683,7 @@ function updateSegCount() {
 async function sendToSheets(seg) {
   if (!SHEETS_WEBHOOK_URL) return;
   var payload = {
+    codice:       seg.codice || '',
     id:           seg.id || '',
     codice:       seg.codice || '',
     data_ora:     seg.timestamp_display || '',
@@ -1899,9 +1993,151 @@ async function salvaInStorico(seg) {
 }
 
 // ════════════════════════════════════════
+// EXPORT PDF ORDINE DI LAVORO
+// ════════════════════════════════════════
+function stampaPDF(id) {
+  var seg = segMarkers[id]?._segData;
+  if (!seg) return;
+
+  var prioColor = seg.priorita === 'ALTA' ? '#e63946' : seg.priorita === 'MEDIA' ? '#f0883e' : '#3fb950';
+  var statoColor = seg.stato === 'RISOLTO' ? '#3fb950' : '#e63946';
+  var mapsUrl = seg.lat ? 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng : '#';
+
+  var html = '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">' +
+    '<title>Ordine di Lavoro ' + (seg.codice||'') + '</title>' +
+    '<style>' +
+    'body{font-family:Arial,sans-serif;margin:0;padding:24px;color:#222;font-size:13px}' +
+    '.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0d47a1;padding-bottom:12px;margin-bottom:20px}' +
+    '.header-left h1{margin:0;font-size:20px;color:#0d47a1;font-weight:700}' +
+    '.header-left p{margin:2px 0;font-size:11px;color:#666}' +
+    '.codice-box{background:#0d47a1;color:white;padding:10px 20px;border-radius:8px;text-align:center}' +
+    '.codice-box .label{font-size:10px;letter-spacing:1px;opacity:0.8}' +
+    '.codice-box .value{font-size:22px;font-weight:700;letter-spacing:2px}' +
+    '.section{margin-bottom:16px}' +
+    '.section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:10px}' +
+    'table{width:100%;border-collapse:collapse}' +
+    'td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}' +
+    'td:first-child{font-weight:600;color:#555;width:140px;font-size:12px}' +
+    '.badge{display:inline-block;padding:3px 10px;border-radius:4px;color:white;font-weight:700;font-size:12px}' +
+    '.footer{margin-top:24px;border-top:1px solid #eee;padding-top:12px;font-size:10px;color:#999;display:flex;justify-content:space-between}' +
+    '.firma-box{border:1px solid #ddd;border-radius:6px;padding:12px;margin-top:16px}' +
+    '.firma-box .label{font-size:10px;color:#999;margin-bottom:30px}' +
+    '.firma-line{border-top:1px solid #bbb;margin-top:8px;padding-top:4px;font-size:10px;color:#999;text-align:center}' +
+    '@media print{body{padding:0}.no-print{display:none}}' +
+    '</style></head><body>' +
+
+    // Header
+    '<div class="header">' +
+    '<div class="header-left">' +
+    '<h1>ORDINE DI LAVORO</h1>' +
+    '<p>Consorzio di Bonifica della Sardegna Centrale</p>' +
+    '<p>Segnalazioni Guasti Rete Idrica</p>' +
+    '</div>' +
+    '<div class="codice-box">' +
+    '<div class="label">CODICE INTERVENTO</div>' +
+    '<div class="value">' + (seg.codice||'N/D') + '</div>' +
+    '</div></div>' +
+
+    // Dati intervento
+    '<div class="section"><div class="section-title">Dati intervento</div>' +
+    '<table>' +
+    '<tr><td>Tipo guasto</td><td><strong>' + (seg.tipo||'—') + '</strong></td></tr>' +
+    '<tr><td>Priorità</td><td><span class="badge" style="background:' + prioColor + '">' + (seg.priorita||'—') + '</span></td></tr>' +
+    '<tr><td>Stato</td><td><span class="badge" style="background:' + statoColor + '">' + (seg.stato||'—') + '</span></td></tr>' +
+    '<tr><td>Zona</td><td>' + (seg.zona_label||'—') + '</td></tr>' +
+    '<tr><td>Descrizione</td><td>' + (seg.descrizione||'—') + '</td></tr>' +
+    '<tr><td>Segnalato da</td><td>' + (seg.segnalato_da||'—') + '</td></tr>' +
+    '<tr><td>Data / Ora</td><td>' + (seg.timestamp_display||'—') + '</td></tr>' +
+    '</table></div>' +
+
+    // Coordinate
+    '<div class="section"><div class="section-title">Localizzazione</div>' +
+    '<table>' +
+    '<tr><td>Coordinate</td><td style="font-family:monospace">' + (seg.lat ? seg.lat.toFixed(6) : '—') + ', ' + (seg.lng ? seg.lng.toFixed(6) : '—') + '</td></tr>' +
+    '<tr><td>Google Maps</td><td><a href="' + mapsUrl + '" style="color:#1a73e8">' + mapsUrl + '</a></td></tr>' +
+    '</table></div>' +
+
+    // Firma operatore
+    '<div class="firma-box">' +
+    '<div class="label">Firma operatore incaricato</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">' +
+    '<div><div class="firma-line">Nome e cognome</div></div>' +
+    '<div><div class="firma-line">Firma</div></div>' +
+    '</div>' +
+    '<div style="margin-top:12px"><div class="firma-line">Data intervento _________________________ Ora fine _____________</div></div>' +
+    '</div>' +
+
+    // Note
+    '<div class="section" style="margin-top:16px"><div class="section-title">Note intervento</div>' +
+    '<div style="border:1px solid #eee;border-radius:6px;height:60px;padding:8px;color:#ccc;font-size:11px">Spazio per note aggiuntive...</div></div>' +
+
+    // Footer
+    '<div class="footer">' +
+    '<span>CBSC — Segnalazioni Guasti &nbsp;|&nbsp; ' + (seg.codice||'') + '</span>' +
+    '<span>Generato il ' + new Date().toLocaleString('it-IT') + '</span>' +
+    '</div>' +
+
+    '<div class="no-print" style="margin-top:20px;text-align:center">' +
+    '<button onclick="window.print()" style="padding:10px 30px;background:#0d47a1;color:white;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">Stampa / Salva PDF</button>' +
+    '</div>' +
+    '</body></html>';
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(function() { win.print(); }, 500);
+}
+
+// ════════════════════════════════════════
 // LISTA INTERVENTI
 // ════════════════════════════════════════
 var _filtroAttivo = 'tutti';
+
+function cercaPerCodice(query) {
+  query = query.trim().toUpperCase();
+  if (!query) {
+    renderListaInterventi();
+    return;
+  }
+  var list = document.getElementById('interventi-list');
+  var segs = Object.values(segMarkers).map(function(m) { return m._segData; }).filter(Boolean);
+  var found = segs.filter(function(s) {
+    return (s.codice || '').toUpperCase().includes(query);
+  });
+
+  if (found.length === 0) {
+    list.innerHTML = '<div class="interventi-empty">Nessun intervento trovato per "' + query + '"</div>';
+    return;
+  }
+
+  // Se trovato uno solo — evidenzialo sulla mappa
+  if (found.length === 1) {
+    var seg = found[0];
+    var color = seg.stato === 'RISOLTO' ? '#3fb950'
+      : seg.priorita === 'ALTA' ? '#e63946'
+      : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922';
+    var badgeClass = seg.stato === 'RISOLTO' ? 'badge-risolto'
+      : seg.priorita === 'ALTA' ? 'badge-alta'
+      : seg.priorita === 'MEDIA' ? 'badge-media' : 'badge-bassa';
+    var badgeLabel = seg.stato === 'RISOLTO' ? 'RISOLTO' : seg.priorita;
+    var btnChiudi = seg.stato !== 'RISOLTO'
+      ? '<button class="btn-chiudi-intervento" onclick="richiesPinChiusura(\'' + seg.id + '\');closeInterventi()">Chiudi intervento</button>'
+      : '';
+    list.innerHTML = '<div class="intervento-card" style="border-color:var(--accent)">' +
+      '<div class="intervento-codice"><span style="border-left:3px solid ' + color + ';padding-left:8px">' + seg.codice + '</span>' +
+      '<span class="intervento-badge ' + badgeClass + '">' + badgeLabel + '</span></div>' +
+      '<div class="intervento-tipo">' + seg.tipo + '</div>' +
+      '<div class="intervento-meta"><span>📍 ' + seg.zona_label + '</span><span>🕐 ' + seg.timestamp_display + '</span></div>' +
+      '<div class="intervento-desc">' + (seg.descrizione||'').substring(0,100) + '</div>' +
+      '<div class="intervento-actions">' +
+      '<button class="btn-vai-mappa" onclick="vaiAlMarker(\'' + seg.id + '\')">Vai alla mappa</button>' +
+      btnChiudi + '</div></div>';
+    return;
+  }
+
+  // Più risultati — mostrali tutti
+  renderListaInterventi();
+}
 
 function openInterventi() {
   document.getElementById('interventi-panel').classList.add('open');
@@ -1967,7 +2203,8 @@ function renderListaInterventi() {
       '</div>' +
       '<div class="intervento-desc">' + (seg.descrizione || '').substring(0, 100) + '</div>' +
       '<div class="intervento-actions">' +
-        '<button class="btn-vai-mappa" onclick="vaiAlMarker(\'' + seg.id + '\')">Vai alla mappa</button>' +
+        '<button class="btn-vai-mappa" onclick="vaiAlMarker(\'' + seg.id + '\')">Mappa</button>' +
+        '<button class="btn-pdf-intervento" onclick="stampaPDF(\'' + seg.id + '\')">PDF</button>' +
         btnChiudi +
       '</div>' +
     '</div>';
@@ -1979,8 +2216,11 @@ function vaiAlMarker(id) {
   closeInterventi();
   var marker = segMarkers[id];
   if (marker) {
+    // Chiudi form se aperto
+    document.getElementById('form-panel').classList.remove('open');
+    document.getElementById('tap-hint').style.display = 'flex';
     map.setView(marker.getLatLng(), 16);
-    setTimeout(function() { marker.openPopup(); }, 300);
+    setTimeout(function() { marker.openPopup(); }, 400);
   }
 }
 
