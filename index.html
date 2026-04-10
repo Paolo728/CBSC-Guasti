@@ -1460,7 +1460,6 @@ function inviaForm() {
     seg.foto = fotosB64;
     return Promise.all([
       saveToFirebase(seg),
-      sendTelegram(seg),
     ]);
   }).then(function(results) {
     var fbId = results[0];
