@@ -1149,19 +1149,10 @@ const APP_URL = 'https://paolo728.github.io/CBSC-Guasti/';
 const FB_PROJECT = 'cbsc-guasti-a859b';
 const FB_BASE    = 'https://firestore.googleapis.com/v1/projects/' + FB_PROJECT + '/databases/(default)/documents';
 
-// Telegram
-const TG_TOKEN = '8779402632:AAFSNks_ksJg2_VTKaqWuy6_vjP6LNTRRGk';
-const TG_CHATS = {
-  'MVT':         '-1003953122206',
-  'CEDRINO':     '-1003768877851',
-  'POSADA_NORD': '-1003958117963',
-  'POSADA_SUD':  '-1003563856537'
-};
+// Telegram gestito da Google Apps Script (vedi CBSC_AppScript_v4.gs)
 
 // ════════════════════════════════════════
 // GOOGLE SHEETS WEBHOOK
-// Incolla qui l'URL del tuo Apps Script dopo averlo creato
-// (vedi istruzioni nel file README_SHEETS.txt allegato)
 // ════════════════════════════════════════
 const SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzZHnvW9JkT9dMieI4ULcQr0X3DvDZftXFIWBT6ty-1SDPE24ugjf7kRfM7LcU_oN-H/exec';
 
@@ -1718,34 +1709,7 @@ async function sendToSheets(seg) {
   });
 }
 
-// Email inviate tramite Google Apps Script webhook (vedi sendToSheets)
-
-// ════════════════════════════════════════
-// TELEGRAM
-// ════════════════════════════════════════
-async function sendTelegram(seg) {
-  var chatId = selectedZona ? TG_CHATS[selectedZona] : null;
-  if (!chatId) return;
-  var prioEmoji = seg.priorita === 'ALTA' ? '🔴' : seg.priorita === 'MEDIA' ? '🟡' : '🟢';
-  var mapsUrl   = 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng;
-  var text = '🚨 *NUOVA SEGNALAZIONE GUASTO*\n\n' +
-    prioEmoji + ' *Priorità:* ' + seg.priorita + '\n' +
-    '🔧 *Tipo:* ' + seg.tipo + '\n' +
-    '📍 *Zona:* ' + seg.zona_label + '\n' +
-    '📝 *Descrizione:* ' + seg.descrizione + '\n' +
-    '👤 *Segnalato da:* ' + seg.segnalato_da + '\n' +
-    '🕐 *Data/ora:* ' + seg.timestamp_display + '\n\n' +
-    '🗺 [Vedi posizione su Google Maps](' + mapsUrl + ')';
-  var resp = await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'Markdown', disable_web_page_preview: false })
-  });
-  if (!resp.ok) {
-    var err = await resp.json();
-    console.warn('Telegram error:', err);
-  }
-}
+// Email e Telegram gestiti tramite Google Apps Script webhook
 
 // ════════════════════════════════════════
 // GPS
