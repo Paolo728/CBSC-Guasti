@@ -511,7 +511,129 @@ textarea{resize:none;min-height:90px;}
 .leaflet-popup-content-wrapper{background:var(--dark2)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 4px 20px rgba(0,0,0,0.4)!important;color:var(--text)!important;}
 .leaflet-popup-tip{background:var(--dark2)!important;}
 
-/* ── STATS PANEL ── */
+/* ── LISTA INTERVENTI ── */
+.interventi-panel {
+  position: fixed; inset: 0;
+  background: var(--dark);
+  z-index: 900;
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+.interventi-panel.open { transform: translateX(0); }
+
+.interventi-header {
+  background: var(--dark2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  height: 56px;
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+.interventi-header h2 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 700; flex: 1;
+}
+.interventi-close {
+  width: 36px; height: 36px;
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; color: var(--text2);
+  font-size: 16px; display: flex; align-items: center; justify-content: center;
+}
+.interventi-body {
+  flex: 1; overflow-y: auto; padding: 12px 16px;
+}
+.interventi-body::-webkit-scrollbar { width: 4px; }
+.interventi-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.intervento-card {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.intervento-card.risolto {
+  opacity: 0.5;
+  border-color: var(--green);
+}
+.intervento-codice {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px; font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.intervento-badge {
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.badge-alta { background: rgba(230,57,70,0.2); color: var(--red); border: 1px solid var(--red); }
+.badge-media { background: rgba(240,136,62,0.2); color: var(--orange); border: 1px solid var(--orange); }
+.badge-bassa { background: rgba(210,153,34,0.2); color: var(--yellow); border: 1px solid var(--yellow); }
+.badge-risolto { background: rgba(63,185,80,0.2); color: var(--green); border: 1px solid var(--green); }
+
+.intervento-tipo {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  margin-bottom: 4px;
+}
+.intervento-meta {
+  font-size: 12px; color: var(--text2);
+  display: flex; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.intervento-desc {
+  font-size: 12px; color: var(--text2);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+.intervento-actions {
+  display: flex; gap: 8px;
+}
+.btn-vai-mappa {
+  flex: 1; padding: 8px;
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text2);
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-vai-mappa:hover { border-color: var(--accent); color: var(--accent); }
+.btn-chiudi-intervento {
+  flex: 1; padding: 8px;
+  background: rgba(210,153,34,0.1);
+  border: 1px solid var(--yellow);
+  border-radius: 8px;
+  color: var(--yellow);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-chiudi-intervento:hover { background: rgba(210,153,34,0.2); }
+
+.interventi-empty {
+  text-align: center; padding: 60px 20px;
+  color: var(--text3); font-size: 14px;
+}
+.interventi-filter {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.filter-btn {
+  padding: 6px 14px;
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text2);
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px; cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-btn.active { background: var(--accent); border-color: var(--accent); color: var(--dark); font-weight: 700; }
+.filter-btn.active-red { background: var(--red); border-color: var(--red); color: white; font-weight: 700; }
 .stats-btn {
   background: rgba(255,255,255,0.08);
   border: 1px solid var(--border);
@@ -762,9 +884,9 @@ textarea{resize:none;min-height:90px;}
       <div class="legend-row"><div class="legend-dot" style="background:#2d6a4f"></div>Posada Nord</div>
       <div class="legend-row"><div class="legend-dot" style="background:#457b9d"></div>Posada Sud</div>
     </div>
-    <div class="segnalazioni-btn" id="seg-btn" onclick="toggleSegList()">
+    <div class="segnalazioni-btn" id="seg-btn" onclick="openInterventi()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      Attive <span class="seg-count" id="seg-count">0</span>
+      Interventi <span class="seg-count" id="seg-count">0</span>
     </div>
 
     <!-- BOTTONE ROSSO PRINCIPALE -->
@@ -872,6 +994,22 @@ textarea{resize:none;min-height:90px;}
       <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
       INVIA SEGNALAZIONE
     </button>
+  </div>
+</div>
+
+<!-- LISTA INTERVENTI -->
+<div class="interventi-panel" id="interventi-panel">
+  <div class="interventi-header">
+    <h2>📋 Interventi</h2>
+    <button class="interventi-close" onclick="closeInterventi()">✕</button>
+  </div>
+  <div class="interventi-body" id="interventi-body">
+    <div class="interventi-filter">
+      <button class="filter-btn active" id="f-tutti" onclick="filterInterventi('tutti')">Tutti</button>
+      <button class="filter-btn" id="f-aperti" onclick="filterInterventi('aperti')">Aperti</button>
+      <button class="filter-btn" id="f-risolti" onclick="filterInterventi('risolti')">Risolti</button>
+    </div>
+    <div id="interventi-list"></div>
   </div>
 </div>
 
@@ -1194,6 +1332,7 @@ function inviaForm() {
   if (!desc)        { showToast('Inserisci una descrizione', 'error'); return; }
 
   var seg = {
+    codice: generaCodice(),
     tipo: selTipoVal, priorita: selPrioVal,
     descrizione: desc, segnalato_da: nome,
     zona: selectedZona || 'SCONOSCIUTA',
@@ -1242,11 +1381,25 @@ function inviaForm() {
   });
 }
 
+// ── GENERAZIONE CODICE INTERVENTO ──
+var _codiceCounter = 0;
+function generaCodice() {
+  var now = new Date();
+  var d = now.getFullYear().toString() +
+    String(now.getMonth()+1).padStart(2,'0') +
+    String(now.getDate()).padStart(2,'0');
+  _codiceCounter++;
+  // Usa timestamp per unicità
+  var seq = String(Date.now()).slice(-4);
+  return d + '-' + seq;
+}
+
 // ════════════════════════════════════════
 // FIREBASE
 // ════════════════════════════════════════
 async function saveToFirebase(seg) {
   var body = { fields: {
+    codice:            { stringValue: seg.codice || '' },
     tipo:              { stringValue: seg.tipo },
     priorita:          { stringValue: seg.priorita },
     descrizione:       { stringValue: seg.descrizione },
@@ -1279,6 +1432,7 @@ async function loadSegnalazioni() {
         var f = doc.fields;
         var seg = {
           id:                doc.name.split('/').pop(),
+          codice:            f.codice?.stringValue || '',
           tipo:              f.tipo?.stringValue || '',
           priorita:          f.priorita?.stringValue || '',
           descrizione:       f.descrizione?.stringValue || '',
@@ -1307,33 +1461,38 @@ function addMarkerToMap(seg) {
   var color = seg.stato === 'RISOLTO'
     ? '#3fb950'
     : (seg.priorita === 'ALTA' ? '#e63946' : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922');
+
+  // Marker con etichetta codice
+  var codiceLabel = seg.codice ? '<div style="background:' + color + ';color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;margin-top:2px;text-align:center">' + seg.codice + '</div>' : '';
   var icon = L.divIcon({
     className: '',
-    html: '<div style="width:20px;height:20px;background:' + color + ';border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>',
-    iconSize: [20,20], iconAnchor: [10,10]
+    html: '<div style="display:flex;flex-direction:column;align-items:center">' +
+          '<div style="width:20px;height:20px;background:' + color + ';border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>' +
+          codiceLabel + '</div>',
+    iconSize: [60, 36], iconAnchor: [30, 10]
   });
+
   var marker = L.marker([seg.lat, seg.lng], { icon: icon }).addTo(map);
+  var prioBadge = '<span style="background:' + color + ';color:white;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">' + (seg.priorita||'') + '</span>';
+  var statoBadge = seg.stato === 'RISOLTO'
+    ? '<span style="background:#3fb95022;color:#3fb950;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #3fb950">RISOLTO</span>'
+    : '<span style="background:#e6394622;color:#e63946;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #e63946">APERTO</span>';
 
-  var prioEmoji = seg.priorita === 'ALTA' ? '🔴' : seg.priorita === 'MEDIA' ? '🟡' : '🟢';
-  var statoStyle = seg.stato === 'RISOLTO'
-    ? 'background:#3fb95022;color:#3fb950;padding:2px 8px;border-radius:6px;font-size:11px;'
-    : 'background:#e6394622;color:#e63946;padding:2px 8px;border-radius:6px;font-size:11px;';
-
-  // Bottone chiusura: sempre visibile, richiede PIN
   var btnChiudi = seg.stato !== 'RISOLTO'
-    ? '<button onclick="richiesPinChiusura(\'' + seg.id + '\')" style="margin-top:8px;padding:5px 10px;background:#d29922;border:none;border-radius:6px;color:#0d1117;font-size:12px;font-weight:700;cursor:pointer">🔒 Segna come risolto</button>'
-    : '<span style="color:#3fb950;font-size:12px;margin-top:6px;display:block">✓ Già risolto</span>';
+    ? '<button onclick="richiesPinChiusura(\'' + seg.id + '\')" style="margin-top:8px;width:100%;padding:6px;background:#d29922;border:none;border-radius:6px;color:#0d1117;font-size:12px;font-weight:700;cursor:pointer">Chiudi intervento</button>'
+    : '<div style="color:#3fb950;font-size:12px;margin-top:6px;text-align:center">Intervento chiuso</div>';
 
   marker.bindPopup(
-    '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px">' +
-    '<strong>' + prioEmoji + ' ' + seg.tipo + '</strong><br>' +
-    '<span style="' + statoStyle + '">' + seg.stato + '</span><br>' +
-    '<span style="color:#8b949e">' + seg.zona_label + '</span><br>' +
-    '<span style="color:#8b949e;font-size:11px">' + seg.timestamp_display + '</span><br>' +
-    '<span style="font-size:12px;margin-top:4px;display:block">' + seg.descrizione.substring(0,80) + '</span>' +
+    '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px;min-width:200px">' +
+    '<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:#58a6ff;margin-bottom:6px">' + (seg.codice || 'N/D') + '</div>' +
+    '<div style="font-weight:600;margin-bottom:4px">' + seg.tipo + '</div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:6px">' + prioBadge + ' ' + statoBadge + '</div>' +
+    '<div style="color:#8b949e;font-size:11px;margin-bottom:2px">' + seg.zona_label + '</div>' +
+    '<div style="color:#8b949e;font-size:11px;margin-bottom:6px">' + seg.timestamp_display + '</div>' +
+    '<div style="font-size:12px;color:#c9d1d9">' + seg.descrizione.substring(0,80) + '</div>' +
     btnChiudi +
     '</div>'
-  , { maxWidth: 240 });
+  , { maxWidth: 260 });
 
   segMarkers[seg.id] = marker;
   marker._segData = seg;
@@ -1385,7 +1544,7 @@ async function risolviSegnalazione(id) {
       segMarkers[id].setIcon(newIcon);
       if (segMarkers[id]._segData) segMarkers[id]._segData.stato = 'RISOLTO';
     }
-    showToast('✅ Segnalazione chiusa correttamente', 'success');
+    showToast('Intervento ' + (segMarkers[id]?._segData?.codice || '') + ' chiuso', 'success');
     var segData = segMarkers[id]?._segData || {};
     salvaInStorico(segData);
     // Aggiorna stato su Sheets
@@ -1399,7 +1558,14 @@ async function risolviSegnalazione(id) {
 }
 
 function updateSegCount() {
-  document.getElementById('seg-count').textContent = Object.keys(segMarkers).length;
+  var aperti = Object.values(segMarkers).filter(function(m) {
+    return m._segData && m._segData.stato === 'APERTO';
+  }).length;
+  document.getElementById('seg-count').textContent = aperti;
+  // Aggiorna lista se aperta
+  if (document.getElementById('interventi-panel').classList.contains('open')) {
+    renderListaInterventi();
+  }
 }
 
 // ════════════════════════════════════════
@@ -1715,8 +1881,90 @@ async function salvaInStorico(seg) {
   } catch(e) { console.warn('Storico save failed:', e); }
 }
 
-function toggleSegList() {
-  showToast('Tocca un marker sulla mappa per i dettagli', '');
+// ════════════════════════════════════════
+// LISTA INTERVENTI
+// ════════════════════════════════════════
+var _filtroAttivo = 'tutti';
+
+function openInterventi() {
+  document.getElementById('interventi-panel').classList.add('open');
+  renderListaInterventi();
+}
+
+function closeInterventi() {
+  document.getElementById('interventi-panel').classList.remove('open');
+}
+
+function filterInterventi(filtro) {
+  _filtroAttivo = filtro;
+  document.querySelectorAll('.filter-btn').forEach(function(b) {
+    b.classList.remove('active', 'active-red');
+  });
+  var btn = document.getElementById('f-' + filtro);
+  if (btn) btn.classList.add(filtro === 'aperti' ? 'active-red' : 'active');
+  renderListaInterventi();
+}
+
+function renderListaInterventi() {
+  var list = document.getElementById('interventi-list');
+  var segs = Object.values(segMarkers).map(function(m) { return m._segData; }).filter(Boolean);
+
+  // Ordina: aperti prima, poi per timestamp decrescente
+  segs.sort(function(a, b) {
+    if (a.stato !== b.stato) return a.stato === 'APERTO' ? -1 : 1;
+    return (b.timestamp_display || '').localeCompare(a.timestamp_display || '');
+  });
+
+  // Filtra
+  if (_filtroAttivo === 'aperti') segs = segs.filter(function(s) { return s.stato === 'APERTO'; });
+  if (_filtroAttivo === 'risolti') segs = segs.filter(function(s) { return s.stato === 'RISOLTO'; });
+
+  if (segs.length === 0) {
+    list.innerHTML = '<div class="interventi-empty">Nessun intervento ' + (_filtroAttivo !== 'tutti' ? _filtroAttivo : '') + '</div>';
+    return;
+  }
+
+  var html = '';
+  segs.forEach(function(seg) {
+    var color = seg.stato === 'RISOLTO' ? '#3fb950'
+      : seg.priorita === 'ALTA' ? '#e63946'
+      : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922';
+    var badgeClass = seg.stato === 'RISOLTO' ? 'badge-risolto'
+      : seg.priorita === 'ALTA' ? 'badge-alta'
+      : seg.priorita === 'MEDIA' ? 'badge-media' : 'badge-bassa';
+    var badgeLabel = seg.stato === 'RISOLTO' ? 'RISOLTO' : seg.priorita;
+
+    var btnChiudi = seg.stato !== 'RISOLTO'
+      ? '<button class="btn-chiudi-intervento" onclick="richiesPinChiusura(\'' + seg.id + '\');closeInterventi()">Chiudi</button>'
+      : '';
+
+    html += '<div class="intervento-card ' + (seg.stato === 'RISOLTO' ? 'risolto' : '') + '">' +
+      '<div class="intervento-codice">' +
+        '<span style="border-left:3px solid ' + color + ';padding-left:8px">' + (seg.codice || 'N/D') + '</span>' +
+        '<span class="intervento-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+      '</div>' +
+      '<div class="intervento-tipo">' + seg.tipo + '</div>' +
+      '<div class="intervento-meta">' +
+        '<span>📍 ' + seg.zona_label + '</span>' +
+        '<span>🕐 ' + seg.timestamp_display + '</span>' +
+      '</div>' +
+      '<div class="intervento-desc">' + (seg.descrizione || '').substring(0, 100) + '</div>' +
+      '<div class="intervento-actions">' +
+        '<button class="btn-vai-mappa" onclick="vaiAlMarker(\'' + seg.id + '\')">Vai alla mappa</button>' +
+        btnChiudi +
+      '</div>' +
+    '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function vaiAlMarker(id) {
+  closeInterventi();
+  var marker = segMarkers[id];
+  if (marker) {
+    map.setView(marker.getLatLng(), 16);
+    setTimeout(function() { marker.openPopup(); }, 300);
+  }
 }
 
 </script>
