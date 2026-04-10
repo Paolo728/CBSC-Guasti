@@ -637,7 +637,7 @@ textarea{resize:none;min-height:90px;}
   <div id="map" style="position:relative">
     <div class="tap-hint" id="tap-hint">
       <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      Tocca la mappa per segnalare un guasto
+      Usa il bottone rosso oppure tocca la mappa
     </div>
     <div class="map-legend" id="map-legend">
       <div class="legend-title">Zone</div>
@@ -650,6 +650,12 @@ textarea{resize:none;min-height:90px;}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       Attive <span class="seg-count" id="seg-count">0</span>
     </div>
+    <button class="btn-segnala" id="btn-segnala" onclick="segnalaConGPS()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
+      SEGNALA GUASTO QUI
+    </button>
     <div class="gps-btn" id="gps-btn" onclick="toggleGps()">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
@@ -1317,6 +1323,58 @@ function showToast(msg, type) {
   setTimeout(function() { t.classList.remove('show'); }, 3000);
 }
 
+
+
+// ── SEGNALA CON GPS ──
+function segnalaConGPS() {
+  var btn = document.getElementById('btn-segnala');
+  if (!navigator.geolocation) {
+    showToast('GPS non disponibile su questo dispositivo', 'error');
+    return;
+  }
+  btn.classList.add('loading');
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> Rilevamento posizione...';
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      var lat = pos.coords.lat || pos.coords.latitude;
+      var lng = pos.coords.lon || pos.coords.longitude;
+      // Fix: use correct property names
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+
+      btn.classList.remove('loading');
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> SEGNALA GUASTO QUI';
+
+      // Center map on position
+      map.setView([lat, lng], 16);
+
+      // Add/update GPS marker
+      if (!geoMarker) {
+        geoMarker = L.circleMarker([lat, lng], {
+          radius: 10, color: '#58a6ff', fillColor: '#58a6ff',
+          fillOpacity: 0.9, weight: 3
+        }).addTo(map);
+      } else {
+        geoMarker.setLatLng([lat, lng]);
+      }
+
+      // Open form at GPS position
+      openFormAtPoint(lat, lng);
+      showToast('📍 Posizione rilevata con precisione ' + Math.round(pos.coords.accuracy) + 'm', 'success');
+    },
+    function(err) {
+      btn.classList.remove('loading');
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> SEGNALA GUASTO QUI';
+      if (err.code === 1) {
+        showToast('Abilita il GPS nelle impostazioni del telefono', 'error');
+      } else {
+        showToast('Impossibile rilevare la posizione', 'error');
+      }
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
 
 // ── STATS ──
 async function openStats() {
