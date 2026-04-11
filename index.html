@@ -2188,7 +2188,7 @@ async function salvaInStorico(seg) {
   var aperturaTs = seg.timestamp ? new Date(seg.timestamp).getTime() : now;
   var durata_ore = Math.round((now - aperturaTs) / 1000 / 60 / 60 * 10) / 10;
   var d = new Date(aperturaTs);
-  Logger && console.log('salvaInStorico - timestamp:', seg.timestamp, 'durata_ore:', durata_ore);
+  console.log('salvaInStorico - timestamp:', seg.timestamp, 'durata_ore:', durata_ore);
   var body = { fields: {
     tipo:              { stringValue: seg.tipo || '' },
     priorita:          { stringValue: seg.priorita || '' },
