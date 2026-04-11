@@ -1038,6 +1038,7 @@ textarea{resize:none;min-height:90px;}
     <div class="interventi-filter">
       <button class="filter-btn active" id="f-tutti" onclick="filterInterventi('tutti')">Tutti</button>
       <button class="filter-btn" id="f-aperti" onclick="filterInterventi('aperti')">Aperti</button>
+      <button class="filter-btn" id="f-carico" onclick="filterInterventi('carico')">In carico</button>
       <button class="filter-btn" id="f-risolti" onclick="filterInterventi('risolti')">Risolti</button>
     </div>
     <div class="interventi-filter" style="margin-top:-4px">
@@ -2417,11 +2418,11 @@ function closeInterventi() {
 
 function filterInterventi(filtro) {
   _filtroAttivo = filtro;
-  document.querySelectorAll('.filter-btn').forEach(function(b) {
+  document.querySelectorAll('.filter-btn:not([id^="f-zona"])').forEach(function(b) {
     b.classList.remove('active', 'active-red');
   });
   var btn = document.getElementById('f-' + filtro);
-  if (btn) btn.classList.add(filtro === 'aperti' ? 'active-red' : 'active');
+  if (btn) btn.classList.add(filtro === 'aperti' ? 'active-red' : filtro === 'carico' ? 'active' : 'active');
   renderListaInterventi();
 }
 
@@ -2436,7 +2437,8 @@ function renderListaInterventi() {
   });
 
   // Filtra per stato
-  if (_filtroAttivo === 'aperti') segs = segs.filter(function(s) { return s.stato === 'APERTO' || s.stato === 'PRESO_IN_CARICO'; });
+  if (_filtroAttivo === 'aperti') segs = segs.filter(function(s) { return s.stato === 'APERTO'; });
+  if (_filtroAttivo === 'carico') segs = segs.filter(function(s) { return s.stato === 'PRESO_IN_CARICO'; });
   if (_filtroAttivo === 'risolti') segs = segs.filter(function(s) { return s.stato === 'RISOLTO'; });
 
   // Filtra per zona
