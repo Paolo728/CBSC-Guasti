@@ -1335,13 +1335,11 @@ function initApp() {
     Object.values(segMarkers).forEach(function(m) {
       if (!m._segData) return;
       var seg = m._segData;
-      // Usa colore aggiornato in base allo stato corrente
       var col = seg.stato === 'RISOLTO' ? '#3fb950'
         : seg.stato === 'PRESO_IN_CARICO' ? '#58a6ff'
-        : seg.priorita === 'ALTA' ? '#e63946'
-        : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922';
+        : '#e63946'; // APERTO sempre rosso
       var codiceLabel = (showLabel && seg.codice)
-        ? '<div style="background:' + col + ';color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;margin-top:2px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.4)">' + seg.codice + '</div>'
+        ? '<div style="background:' + col + ';color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;margin-top:2px;text-align:center">' + seg.codice + '</div>'
         : '';
       var icon = L.divIcon({
         className: '',
@@ -1592,7 +1590,7 @@ function addMarkerToMap(seg) {
   if (!seg.lat || !seg.lng) return;
   var color = seg.stato === 'RISOLTO' ? '#3fb950'
     : seg.stato === 'PRESO_IN_CARICO' ? '#58a6ff'
-    : (seg.priorita === 'ALTA' ? '#e63946' : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922');
+    : '#e63946'; // APERTO sempre rosso
 
   function buildIcon(showLabel) {
     var codiceLabel = (showLabel && seg.codice)
@@ -2073,7 +2071,8 @@ function renderStats(docs, activeCount, allSegs) {
   var monthSegs = tutteSegs.filter(function(r) { return r.anno === thisYear && r.mese === thisMonth + 1; });
   var totAnno   = yearSegs.length;
   var totMese   = monthSegs.length;
-  var risolte   = tutteSegs.filter(function(r) { return r.stato === 'RISOLTO'; }).length + records.length;
+  // Risolte = solo quelle con stato RISOLTO nelle segnalazioni attive
+  var risolte   = tutteSegs.filter(function(r) { return r.stato === 'RISOLTO'; }).length;
 
   var months = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
   var monthCounts = Array(12).fill(0);
@@ -2144,12 +2143,18 @@ function renderStats(docs, activeCount, allSegs) {
 
   // Tempo medio per tipologia - sempre visibile
   var tipoTempi = {};
+  // Dallo storico (ha durata_ore)
   records.forEach(function(r) {
     if (r.tipo && r.durata_ore >= 0) {
       if (!tipoTempi[r.tipo]) tipoTempi[r.tipo] = { somma: 0, count: 0 };
       tipoTempi[r.tipo].somma += r.durata_ore;
       tipoTempi[r.tipo].count += 1;
     }
+  });
+  // Aggiungi tipi dalle segnalazioni risolte senza durata (conteggio 0)
+  tutteSegs.filter(function(r) { return r.stato === 'RISOLTO' && r.tipo; }).forEach(function(r) {
+    if (!tipoTempi[r.tipo]) tipoTempi[r.tipo] = { somma: 0, count: 0 };
+    // Non aggiungere alla somma se già nello storico (evita duplicati)
   });
   var tipiConTempi = Object.keys(tipoTempi);
   html += '<div class="stats-section"><h3>⏱ Tempo medio risoluzione</h3>';
@@ -2431,9 +2436,14 @@ function renderListaInterventi() {
   var list = document.getElementById('interventi-list');
   var segs = Object.values(segMarkers).map(function(m) { return m._segData; }).filter(Boolean);
 
-  // Ordina: aperti prima, poi per timestamp decrescente
+  // Ordina: più recente prima, poi aperti prima dei risolti
   segs.sort(function(a, b) {
-    if (a.stato !== b.stato) return a.stato === 'APERTO' ? -1 : 1;
+    if (a.stato !== b.stato) {
+      if (a.stato === 'APERTO') return -1;
+      if (b.stato === 'APERTO') return 1;
+      if (a.stato === 'PRESO_IN_CARICO') return -1;
+      if (b.stato === 'PRESO_IN_CARICO') return 1;
+    }
     return (b.timestamp_display || '').localeCompare(a.timestamp_display || '');
   });
 
