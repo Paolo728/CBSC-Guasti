@@ -1302,6 +1302,12 @@ function initApp() {
   }
 
   map.on('click', function(e) {
+    // Su mobile usa sempre il GPS, non il tap
+    var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      showToast('Usa il bottone rosso per segnalare', '');
+      return;
+    }
     openFormAtPoint(e.latlng.lat, e.latlng.lng);
   });
 
@@ -2016,7 +2022,7 @@ function renderStats(docs, activeCount) {
   html += '<div class="donut-card"><h3>Per tipo</h3>' + buildDonut(tipoCounts, tipoColMap, tipoKeys, totalTipo, null) + '</div>';
   html += '</div>';
 
-  // Tempo medio per tipologia
+  // Tempo medio per tipologia - sempre visibile
   var tipoTempi = {};
   records.forEach(function(r) {
     if (r.tipo && r.durata_ore > 0) {
@@ -2026,8 +2032,10 @@ function renderStats(docs, activeCount) {
     }
   });
   var tipiConTempi = Object.keys(tipoTempi);
-  if (tipiConTempi.length > 0) {
-    html += '<div class="stats-section"><h3>⏱ Tempo medio risoluzione</h3>';
+  html += '<div class="stats-section"><h3>⏱ Tempo medio risoluzione</h3>';
+  if (tipiConTempi.length === 0) {
+    html += '<div style="text-align:center;color:var(--text3);font-size:13px;padding:16px">Nessun dato ancora — appare dopo la prima chiusura intervento</div>';
+  } else {
     html += '<div style="display:flex;flex-direction:column;gap:8px">';
     tipiConTempi.forEach(function(tipo, idx) {
       var media = tipoTempi[tipo].somma / tipoTempi[tipo].count;
@@ -2044,8 +2052,9 @@ function renderStats(docs, activeCount) {
         '<span style="font-size:11px;color:var(--text3);margin-left:4px">(' + tipoTempi[tipo].count + ')</span>' +
         '</div>';
     });
-    html += '</div></div>';
+    html += '</div>';
   }
+  html += '</div>';
 
   document.getElementById('stats-body').innerHTML = html;
 }
