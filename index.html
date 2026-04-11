@@ -574,6 +574,16 @@ textarea{resize:none;min-height:90px;}
 .badge-media { background: rgba(240,136,62,0.2); color: var(--orange); border: 1px solid var(--orange); }
 .badge-bassa { background: rgba(210,153,34,0.2); color: var(--yellow); border: 1px solid var(--yellow); }
 .badge-risolto { background: rgba(63,185,80,0.2); color: var(--green); border: 1px solid var(--green); }
+.badge-preso { background: rgba(88,166,255,0.2); color: var(--accent); border: 1px solid var(--accent); }
+
+/* Lampeggio interventi non presi in carico */
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.intervento-card.non-preso .intervento-codice {
+  animation: pulse-red 1.5s ease-in-out infinite;
+}
 
 .intervento-tipo {
   font-size: 14px; font-weight: 600; color: var(--text);
@@ -1320,6 +1330,7 @@ function initApp() {
       var seg = m._segData;
       // Usa colore aggiornato in base allo stato corrente
       var col = seg.stato === 'RISOLTO' ? '#3fb950'
+        : seg.stato === 'PRESO_IN_CARICO' ? '#58a6ff'
         : seg.priorita === 'ALTA' ? '#e63946'
         : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922';
       var codiceLabel = (showLabel && seg.codice)
@@ -1459,7 +1470,6 @@ function inviaForm() {
   document.getElementById('sending-text').textContent = 'Salvataggio e invio notifiche...';
   document.getElementById('btn-send').classList.add('loading');
 
-  // Converti foto in base64
   var fotoPromises = fotoFiles.map(function(file) {
     return new Promise(function(resolve) {
       var reader = new FileReader();
@@ -1479,6 +1489,7 @@ function inviaForm() {
   }).then(function(results) {
     var fbId = results[0];
     seg.id = fbId;
+    // Manda a Sheets (che invia anche la mail)
     sendToSheets(seg).catch(function(e) { console.warn('Sheets webhook error:', e); });
     document.getElementById('sending-overlay').classList.remove('show');
     showSuccess(seg);
@@ -1556,7 +1567,8 @@ async function loadSegnalazioni() {
           stato:             f.stato?.stringValue || 'APERTO',
           ttl:               parseInt(f.ttl?.integerValue || '0'),
           foto_links:        f.foto_links?.stringValue || '',
-          timestamp:         f.timestamp?.stringValue || ''
+          timestamp:         f.timestamp?.stringValue || '',
+          preso_da:          f.preso_da?.stringValue || ''
         };
         if (seg.ttl && Date.now() > seg.ttl) return;
         addMarkerToMap(seg);
@@ -1571,8 +1583,8 @@ async function loadSegnalazioni() {
 // ════════════════════════════════════════
 function addMarkerToMap(seg) {
   if (!seg.lat || !seg.lng) return;
-  var color = seg.stato === 'RISOLTO'
-    ? '#3fb950'
+  var color = seg.stato === 'RISOLTO' ? '#3fb950'
+    : seg.stato === 'PRESO_IN_CARICO' ? '#58a6ff'
     : (seg.priorita === 'ALTA' ? '#e63946' : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922');
 
   function buildIcon(showLabel) {
@@ -1594,11 +1606,16 @@ function addMarkerToMap(seg) {
   var prioBadge = '<span style="background:' + color + ';color:white;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">' + (seg.priorita||'') + '</span>';
   var statoBadge = seg.stato === 'RISOLTO'
     ? '<span style="background:#3fb95022;color:#3fb950;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #3fb950">RISOLTO</span>'
+    : seg.stato === 'PRESO_IN_CARICO'
+    ? '<span style="background:#58a6ff22;color:#58a6ff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #58a6ff">PRESO IN CARICO' + (seg.preso_da ? ' — ' + seg.preso_da : '') + '</span>'
     : '<span style="background:#e6394622;color:#e63946;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #e63946">APERTO</span>';
 
-  var btnChiudi = seg.stato !== 'RISOLTO'
+  var btnChiudi = seg.stato === 'RISOLTO'
+    ? '<div style="color:#3fb950;font-size:12px;margin-top:6px;text-align:center">Intervento chiuso</div>'
+    : seg.stato === 'PRESO_IN_CARICO'
     ? '<button onclick="richiesPinChiusura(\'' + seg.id + '\')" style="margin-top:8px;width:100%;padding:6px;background:#d29922;border:none;border-radius:6px;color:#0d1117;font-size:12px;font-weight:700;cursor:pointer">Chiudi intervento</button>'
-    : '<div style="color:#3fb950;font-size:12px;margin-top:6px;text-align:center">Intervento chiuso</div>';
+    : '<button onclick="prendiInCarico(\'' + seg.id + '\')" style="margin-top:8px;width:100%;padding:6px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;font-size:12px;font-weight:700;cursor:pointer">🔵 Prendi in carico</button>' +
+      '<button onclick="richiesPinChiusura(\'' + seg.id + '\')" style="margin-top:6px;width:100%;padding:6px;background:#d29922;border:none;border-radius:6px;color:#0d1117;font-size:12px;font-weight:700;cursor:pointer">Chiudi intervento</button>';
 
   var btnPDF = '<button onclick="stampaPDF(\'' + seg.id + '\')" style="margin-top:6px;width:100%;padding:6px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;font-size:12px;font-weight:700;cursor:pointer">Esporta PDF</button>';
 
@@ -1662,6 +1679,55 @@ function confirmPin() {
     document.getElementById('pin-input').classList.add('error');
     document.getElementById('pin-err').style.display = 'block';
     document.getElementById('pin-input').value = '';
+  }
+}
+
+async function prendiInCarico(id) {
+  var nome = prompt('Inserisci il tuo nome:');
+  if (!nome) return;
+  try {
+    var url = FB_BASE + '/segnalazioni/' + id + '?updateMask.fieldPaths=stato&updateMask.fieldPaths=preso_da';
+    await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: {
+        stato:    { stringValue: 'PRESO_IN_CARICO' },
+        preso_da: { stringValue: nome }
+      }})
+    });
+    map.closePopup();
+    if (segMarkers[id]) {
+      var m = segMarkers[id];
+      m._segData.stato    = 'PRESO_IN_CARICO';
+      m._segData.preso_da = nome;
+      var newIcon = L.divIcon({
+        className: '',
+        html: '<div style="display:flex;flex-direction:column;align-items:center">' +
+              '<div style="width:20px;height:20px;background:#58a6ff;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div></div>',
+        iconSize: [20,20], iconAnchor: [10,10]
+      });
+      m.setIcon(newIcon);
+      clusterGroup.refreshClusters(m);
+    }
+    showToast('✅ Intervento preso in carico da ' + nome, 'success');
+    updateSegCount();
+    if (SHEETS_WEBHOOK_URL) {
+      var segData = segMarkers[id]?._segData || {};
+      sendToSheets(Object.assign({}, segData, { stato: 'PRESO_IN_CARICO', _action: 'update' })).catch(function(){});
+    }
+    // Telegram notifica
+    var segData2 = segMarkers[id]?._segData || {};
+    var chatId = TG_CHATS[segData2.zona];
+    if (chatId) {
+      fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, parse_mode: 'Markdown',
+          text: '🔵 *PRESO IN CARICO*\n\n📋 *Codice:* `' + (segData2.codice||'N/D') + '`\n👤 *Operatore:* ' + nome + '\n🔧 *Tipo:* ' + (segData2.tipo||'') + '\n📍 *Zona:* ' + (segData2.zona_label||'')
+        })
+      }).catch(function(){});
+    }
+  } catch(e) {
+    showToast('Errore presa in carico', 'error');
   }
 }
 
@@ -1730,7 +1796,7 @@ async function risolviSegnalazione(id) {
 
 function updateSegCount() {
   var aperti = Object.values(segMarkers).filter(function(m) {
-    return m._segData && m._segData.stato === 'APERTO';
+    return m._segData && (m._segData.stato === 'APERTO' || m._segData.stato === 'PRESO_IN_CARICO');
   }).length;
   document.getElementById('seg-count').textContent = aperti;
   // Aggiorna lista se aperta
@@ -1830,24 +1896,42 @@ var _gpsButtonClicked = false;
 
 function toggleGps() {
   _gpsButtonClicked = true;
-  setTimeout(function() { _gpsButtonClicked = false; }, 500);
+  setTimeout(function() { _gpsButtonClicked = false; }, 600);
   var btn = document.getElementById('gps-btn');
   if (!navigator.geolocation) { showToast('GPS non disponibile', 'error'); return; }
   if (geoActive) {
     if (geoWatch) navigator.geolocation.clearWatch(geoWatch);
     if (geoMarker) { map.removeLayer(geoMarker); geoMarker = null; }
-    geoActive = false; btn.classList.remove('active');
+    geoActive = false;
+    geoWatch = null;
+    btn.classList.remove('active');
+    showToast('📍 GPS disattivato', '');
   } else {
+    showToast('📍 Calcolo posizione...', '');
     btn.classList.add('active');
-    geoWatch = navigator.geolocation.watchPosition(function(pos) {
-      var lat = pos.coords.latitude, lng = pos.coords.longitude;
-      if (!geoMarker) {
-        geoMarker = L.circleMarker([lat, lng], { radius: 8, color: '#58a6ff', fillColor: '#58a6ff', fillOpacity: 0.9, weight: 3 }).addTo(map);
-        map.setView([lat, lng], 14);
-      } else { geoMarker.setLatLng([lat, lng]); }
-      geoActive = true;
-    }, function() { btn.classList.remove('active'); geoActive = false; },
-    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+    geoWatch = navigator.geolocation.watchPosition(
+      function(pos) {
+        var lat = pos.coords.latitude, lng = pos.coords.longitude;
+        if (!geoMarker) {
+          geoMarker = L.circleMarker([lat, lng], {
+            radius: 10, color: '#58a6ff', fillColor: '#58a6ff', fillOpacity: 0.9, weight: 3
+          }).addTo(map);
+          map.setView([lat, lng], 14);
+          showToast('📍 Posizione trovata!', 'success');
+        } else {
+          geoMarker.setLatLng([lat, lng]);
+        }
+        geoActive = true;
+      },
+      function(err) {
+        btn.classList.remove('active');
+        geoActive = false;
+        geoWatch = null;
+        if (err.code === 1) showToast('Abilita il GPS nelle impostazioni del browser', 'error');
+        else showToast('Impossibile rilevare la posizione', 'error');
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    );
   }
 }
 
@@ -1935,7 +2019,10 @@ async function loadStats() {
     var docs  = data.documents || [];
     var respA = await fetch(FB_BASE + '/segnalazioni?pageSize=1000');
     var dataA = await respA.json();
-    var active = (dataA.documents || []).filter(function(d) { return d.fields?.stato?.stringValue === 'APERTO'; });
+    var active = (dataA.documents || []).filter(function(d) {
+      var stato = d.fields?.stato?.stringValue || 'APERTO';
+      return stato === 'APERTO' || stato === 'PRESO_IN_CARICO';
+    });
     renderStats(docs, active.length);
   } catch(e) {
     document.getElementById('stats-body').innerHTML = '<div class="stats-empty">Errore caricamento statistiche</div>';
@@ -2312,21 +2399,28 @@ function renderListaInterventi() {
   var html = '';
   segs.forEach(function(seg) {
     var color = seg.stato === 'RISOLTO' ? '#3fb950'
+      : seg.stato === 'PRESO_IN_CARICO' ? '#58a6ff'
       : seg.priorita === 'ALTA' ? '#e63946'
       : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922';
     var badgeClass = seg.stato === 'RISOLTO' ? 'badge-risolto'
+      : seg.stato === 'PRESO_IN_CARICO' ? 'badge-preso'
       : seg.priorita === 'ALTA' ? 'badge-alta'
       : seg.priorita === 'MEDIA' ? 'badge-media' : 'badge-bassa';
-    var badgeLabel = seg.stato === 'RISOLTO' ? 'RISOLTO' : seg.priorita;
+    var badgeLabel = seg.stato === 'RISOLTO' ? 'RISOLTO'
+      : seg.stato === 'PRESO_IN_CARICO' ? '🔵 IN CARICO'
+      : seg.priorita;
+    var nonPreso = seg.stato === 'APERTO';
 
-    var btnChiudi = seg.stato !== 'RISOLTO'
+    var btnChiudi = seg.stato === 'RISOLTO' ? ''
+      : seg.stato === 'PRESO_IN_CARICO'
       ? '<button class="btn-chiudi-intervento" onclick="richiesPinChiusura(\'' + seg.id + '\');closeInterventi()">Chiudi</button>'
-      : '';
+      : '<button class="btn-chiudi-intervento" style="background:rgba(88,166,255,0.1);border-color:#58a6ff;color:#58a6ff" onclick="prendiInCarico(\'' + seg.id + '\')">Prendi in carico</button>';
 
-    html += '<div class="intervento-card ' + (seg.stato === 'RISOLTO' ? 'risolto' : '') + '">' +
+    html += '<div class="intervento-card ' + (seg.stato === 'RISOLTO' ? 'risolto' : '') + ' ' + (nonPreso ? 'non-preso' : '') + '">' +
       '<div class="intervento-codice">' +
         '<span style="border-left:3px solid ' + color + ';padding-left:8px">' + (seg.codice || 'N/D') + '</span>' +
         '<span class="intervento-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+        (seg.preso_da ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">👤 ' + seg.preso_da + '</span>' : '') +
       '</div>' +
       '<div class="intervento-tipo">' + seg.tipo + '</div>' +
       '<div class="intervento-meta">' +
