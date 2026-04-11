@@ -1720,7 +1720,7 @@ async function prendiInCarico(id) {
     updateSegCount();
     if (SHEETS_WEBHOOK_URL) {
       var segData = segMarkers[id]?._segData || {};
-      sendToSheets(Object.assign({}, segData, { stato: 'PRESO_IN_CARICO', _action: 'update' })).catch(function(){});
+      sendToSheets(Object.assign({}, segData, { stato: 'PRESO_IN_CARICO', preso_da: nome, _action: 'update' })).catch(function(){});
     }
     // Telegram notifica
     var segData2 = segMarkers[id]?._segData || {};
@@ -1830,6 +1830,7 @@ async function sendToSheets(seg) {
     lat:          seg.lat ? String(seg.lat) : '',
     lng:          seg.lng ? String(seg.lng) : '',
     stato:        seg.stato || 'APERTO',
+    preso_da:     seg.preso_da || '',
     maps_url:     seg.lat ? 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng : '',
     foto:         seg.foto || [],
     _action:      seg._action || 'insert'
