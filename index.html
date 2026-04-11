@@ -1573,7 +1573,9 @@ async function loadSegnalazioni() {
           ttl:               parseInt(f.ttl?.integerValue || '0'),
           foto_links:        f.foto_links?.stringValue || '',
           timestamp:         f.timestamp?.stringValue || '',
-          preso_da:          f.preso_da?.stringValue || ''
+          preso_da:          f.preso_da?.stringValue || '',
+          chiuso_da:         f.chiuso_da?.stringValue || '',
+          chiuso_il:         f.chiuso_il?.stringValue || ''
         };
         if (seg.ttl && Date.now() > seg.ttl) return;
         addMarkerToMap(seg);
@@ -1738,17 +1740,24 @@ async function prendiInCarico(id) {
 
 async function risolviSegnalazione(id) {
   try {
-    var url = FB_BASE + '/segnalazioni/' + id + '?updateMask.fieldPaths=stato';
+    var chiusoDa = currentUser || 'N/D';
+    var chiusoIl = new Date().toLocaleString('it-IT');
+    var url = FB_BASE + '/segnalazioni/' + id + '?updateMask.fieldPaths=stato&updateMask.fieldPaths=chiuso_da&updateMask.fieldPaths=chiuso_il';
     await fetch(url, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: { stato: { stringValue: 'RISOLTO' } } })
+      body: JSON.stringify({ fields: {
+        stato:     { stringValue: 'RISOLTO' },
+        chiuso_da: { stringValue: chiusoDa },
+        chiuso_il: { stringValue: chiusoIl }
+      }})
     });
     map.closePopup();
     if (segMarkers[id]) {
       var m = segMarkers[id];
-      m._segData.stato = 'RISOLTO';
-      // Rigenera icona verde
+      m._segData.stato     = 'RISOLTO';
+      m._segData.chiuso_da = chiusoDa;
+      m._segData.chiuso_il = chiusoIl;
       var newIcon = L.divIcon({
         className: '',
         html: '<div style="display:flex;flex-direction:column;align-items:center">' +
@@ -1756,10 +1765,9 @@ async function risolviSegnalazione(id) {
         iconSize: [20, 20], iconAnchor: [10, 10]
       });
       m.setIcon(newIcon);
-      // Aggiorna popup con stato RISOLTO
       var seg = m._segData;
       var statoBadge = '<span style="background:#3fb95022;color:#3fb950;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #3fb950">RISOLTO</span>';
-      var prioBadge  = '<span style="background:' + (seg.priorita === 'ALTA' ? '#e63946' : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922') + ';color:white;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">' + (seg.priorita||'') + '</span>';
+      var prioBadge  = '<span style="background:#e63946;color:white;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">' + (seg.priorita||'') + '</span>';
       m.setPopupContent(
         '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px;min-width:200px">' +
         '<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:#58a6ff;margin-bottom:6px">' + (seg.codice||'N/D') + '</div>' +
@@ -1767,18 +1775,18 @@ async function risolviSegnalazione(id) {
         '<div style="display:flex;gap:6px;margin-bottom:6px">' + prioBadge + ' ' + statoBadge + '</div>' +
         '<div style="color:#8b949e;font-size:11px;margin-bottom:2px">' + seg.zona_label + '</div>' +
         '<div style="color:#8b949e;font-size:11px;margin-bottom:6px">' + seg.timestamp_display + '</div>' +
-        '<div style="color:#3fb950;font-size:12px;text-align:center">✓ Intervento chiuso</div>' +
+        '<div style="color:#3fb950;font-size:12px;margin-top:4px">✓ Chiuso da: <strong>' + chiusoDa + '</strong></div>' +
+        '<div style="color:#8b949e;font-size:11px">' + chiusoIl + '</div>' +
         '</div>'
       );
       clusterGroup.refreshClusters(m);
     }
-    showToast('Intervento ' + (segMarkers[id]?._segData?.codice || '') + ' chiuso', 'success');
+    showToast('Intervento chiuso da ' + chiusoDa, 'success');
     var segData = segMarkers[id]?._segData || {};
     salvaInStorico(segData);
     updateSegCount();
-    // Aggiorna Sheets
     if (SHEETS_WEBHOOK_URL) {
-      sendToSheets(Object.assign({}, segData, { stato: 'RISOLTO', _action: 'update' })).catch(function(){});
+      sendToSheets(Object.assign({}, segData, { stato: 'RISOLTO', chiuso_da: chiusoDa, chiuso_il: chiusoIl, _action: 'update' })).catch(function(){});
     }
     // Telegram chiusura
     var chatId = TG_CHATS[segData.zona];
@@ -1788,7 +1796,7 @@ async function risolviSegnalazione(id) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: chatId,
-          text: '✅ *INTERVENTO CHIUSO*\n\n📋 *Codice:* `' + (segData.codice||'N/D') + '`\n🔧 *Tipo:* ' + (segData.tipo||'') + '\n📍 *Zona:* ' + (segData.zona_label||'') + '\n🕐 *Chiuso il:* ' + new Date().toLocaleString('it-IT'),
+          text: '✅ *INTERVENTO CHIUSO*\n\n📋 *Codice:* `' + (segData.codice||'N/D') + '`\n🔧 *Tipo:* ' + (segData.tipo||'') + '\n📍 *Zona:* ' + (segData.zona_label||'') + '\n👤 *Chiuso da:* ' + chiusoDa + '\n🕐 *' + chiusoIl + '*',
           parse_mode: 'Markdown'
         })
       }).catch(function(){});
@@ -1829,6 +1837,8 @@ async function sendToSheets(seg) {
     lng:          seg.lng ? String(seg.lng) : '',
     stato:        seg.stato || 'APERTO',
     preso_da:     seg.preso_da || '',
+    chiuso_da:    seg.chiuso_da || '',
+    chiuso_il:    seg.chiuso_il || '',
     maps_url:     seg.lat ? 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng : '',
     foto:         seg.foto || [],
     _action:      seg._action || 'insert'
@@ -2492,6 +2502,11 @@ function renderListaInterventi() {
       '<div class="intervento-meta">' +
         '<span>📍 ' + seg.zona_label + '</span>' +
         '<span>🕐 ' + seg.timestamp_display + '</span>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;display:flex;flex-wrap:wrap;gap:8px">' +
+        '<span>👤 Segnalato da: <strong style="color:var(--text2)">' + (seg.segnalato_da || '—') + '</strong></span>' +
+        (seg.preso_da ? '<span>🔵 Preso da: <strong style="color:#58a6ff">' + seg.preso_da + '</strong></span>' : '') +
+        (seg.chiuso_da ? '<span>✅ Chiuso da: <strong style="color:#3fb950">' + seg.chiuso_da + '</strong></span>' : '') +
       '</div>' +
       '<div class="intervento-desc">' + (seg.descrizione || '').substring(0, 100) + '</div>' +
       '<div class="intervento-actions">' +
