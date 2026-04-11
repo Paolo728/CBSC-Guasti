@@ -912,7 +912,7 @@ textarea{resize:none;min-height:90px;}
       SEGNALA GUASTO QUI
     </button>
 
-    <div class="gps-btn" id="gps-btn" onclick="toggleGps()">
+    <div class="gps-btn" id="gps-btn" onclick="toggleGps(); event.stopPropagation();">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
       </svg>
@@ -1300,6 +1300,12 @@ function initApp() {
       }).addTo(map);
     })(zoneName);
   }
+
+  // Blocca propagazione click dai controlli UI verso la mappa
+  ['gps-btn', 'btn-segnala', 'seg-btn', 'stats-btn'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) L.DomEvent.disableClickPropagation(el);
+  });
 
   map.on('click', function(e) {
     openFormAtPoint(e.latlng.lat, e.latlng.lng);
