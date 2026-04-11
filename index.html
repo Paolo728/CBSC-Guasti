@@ -1554,7 +1554,8 @@ async function loadSegnalazioni() {
           timestamp_display: f.timestamp_display?.stringValue || '',
           stato:             f.stato?.stringValue || 'APERTO',
           ttl:               parseInt(f.ttl?.integerValue || '0'),
-          foto_links:        f.foto_links?.stringValue || ''
+          foto_links:        f.foto_links?.stringValue || '',
+          timestamp:         f.timestamp?.stringValue || ''
         };
         if (seg.ttl && Date.now() > seg.ttl) return;
         addMarkerToMap(seg);
@@ -1947,7 +1948,7 @@ function renderStats(docs, activeCount) {
       mese:       parseInt(f.mese?.integerValue || '0'),
       anno:       parseInt(f.anno?.integerValue || '0'),
       stato:      f.stato?.stringValue || '',
-      durata_ore: parseFloat(f.durata_ore?.doubleValue || '0')
+      durata_ore: parseFloat(f.durata_ore?.doubleValue || f.durata_ore?.integerValue || '-1')
     };
   });
   var yearRecords  = records.filter(function(r) { return r.anno === thisYear; });
@@ -2025,7 +2026,7 @@ function renderStats(docs, activeCount) {
   // Tempo medio per tipologia - sempre visibile
   var tipoTempi = {};
   records.forEach(function(r) {
-    if (r.tipo && r.durata_ore > 0) {
+    if (r.tipo && r.durata_ore >= 0) {
       if (!tipoTempi[r.tipo]) tipoTempi[r.tipo] = { somma: 0, count: 0 };
       tipoTempi[r.tipo].somma += r.durata_ore;
       tipoTempi[r.tipo].count += 1;
@@ -2091,10 +2092,11 @@ function buildDonut(counts, colors, keys, total, labels) {
 // STORICO
 // ════════════════════════════════════════
 async function salvaInStorico(seg) {
-  var d = new Date(seg.timestamp || Date.now());
-  var chiusuraTs = Date.now();
-  var aperturaTs = seg.timestamp ? new Date(seg.timestamp).getTime() : chiusuraTs;
-  var durata_ore = Math.round((chiusuraTs - aperturaTs) / 1000 / 60 / 60 * 10) / 10; // ore con 1 decimale
+  var now = Date.now();
+  var aperturaTs = seg.timestamp ? new Date(seg.timestamp).getTime() : now;
+  var durata_ore = Math.round((now - aperturaTs) / 1000 / 60 / 60 * 10) / 10;
+  var d = new Date(aperturaTs);
+  Logger && console.log('salvaInStorico - timestamp:', seg.timestamp, 'durata_ore:', durata_ore);
   var body = { fields: {
     tipo:              { stringValue: seg.tipo || '' },
     priorita:          { stringValue: seg.priorita || '' },
@@ -2113,6 +2115,7 @@ async function salvaInStorico(seg) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
+    console.log('Storico salvato con durata_ore:', durata_ore);
   } catch(e) { console.warn('Storico save failed:', e); }
 }
 
