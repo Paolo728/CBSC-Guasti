@@ -2413,8 +2413,10 @@ function renderListaInterventi() {
 
     var btnChiudi = seg.stato === 'RISOLTO' ? ''
       : seg.stato === 'PRESO_IN_CARICO'
-      ? '<button class="btn-chiudi-intervento" onclick="richiesPinChiusura(\'' + seg.id + '\');closeInterventi()">Chiudi</button>'
-      : '<button class="btn-chiudi-intervento" style="background:rgba(88,166,255,0.1);border-color:#58a6ff;color:#58a6ff" onclick="prendiInCarico(\'' + seg.id + '\')">Prendi in carico</button>';
+      ? '<button class="btn-chiudi-intervento" style="background:rgba(88,166,255,0.1);border-color:#58a6ff;color:#58a6ff" onclick="prendiInCarico(\'' + seg.id + '\')">In carico</button>' +
+        '<button class="btn-chiudi-intervento" onclick="richiesPinChiusura(\'' + seg.id + '\');closeInterventi()">Chiudi</button>'
+      : '<button class="btn-chiudi-intervento" style="background:rgba(88,166,255,0.1);border-color:#58a6ff;color:#58a6ff" onclick="prendiInCarico(\'' + seg.id + '\')">Prendi in carico</button>' +
+        '<button class="btn-chiudi-intervento" onclick="richiesPinChiusura(\'' + seg.id + '\');closeInterventi()">Chiudi</button>';
 
     html += '<div class="intervento-card ' + (seg.stato === 'RISOLTO' ? 'risolto' : '') + ' ' + (nonPreso ? 'non-preso' : '') + '">' +
       '<div class="intervento-codice">' +
