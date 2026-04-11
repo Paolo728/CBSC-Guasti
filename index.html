@@ -1307,11 +1307,26 @@ function initApp() {
 
   // Mostra etichette codice solo da zoom 14 in poi
   map.on('zoomend', function() {
-    var showLabel = map.getZoom() >= 14;
-    Object.values(segMarkers).forEach(function(marker) {
-      if (marker._buildIcon) {
-        marker.setIcon(marker._buildIcon(showLabel));
-      }
+    var showLabel = map.getZoom() >= 16;
+    Object.values(segMarkers).forEach(function(m) {
+      if (!m._segData) return;
+      var seg = m._segData;
+      // Usa colore aggiornato in base allo stato corrente
+      var col = seg.stato === 'RISOLTO' ? '#3fb950'
+        : seg.priorita === 'ALTA' ? '#e63946'
+        : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922';
+      var codiceLabel = (showLabel && seg.codice)
+        ? '<div style="background:' + col + ';color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;margin-top:2px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.4)">' + seg.codice + '</div>'
+        : '';
+      var icon = L.divIcon({
+        className: '',
+        html: '<div style="display:flex;flex-direction:column;align-items:center">' +
+              '<div style="width:20px;height:20px;background:' + col + ';border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>' +
+              codiceLabel + '</div>',
+        iconSize: [60, showLabel ? 36 : 20],
+        iconAnchor: [10, 10]
+      });
+      m.setIcon(icon);
     });
   });
 
@@ -1612,14 +1627,6 @@ function addMarkerToMap(seg) {
   marker._segData = seg;
   marker._buildIcon = buildIcon;
   marker._color = color;
-
-  // Aggiorna icona con etichetta quando zoom >= 16 (clustering disabilitato)
-  map.on('zoomend', function() {
-    if (segMarkers[seg.id] && marker._buildIcon) {
-      var showLabel = map.getZoom() >= 16;
-      marker.setIcon(marker._buildIcon(showLabel));
-    }
-  });
 }
 
 // ── PIN CHIUSURA ──
