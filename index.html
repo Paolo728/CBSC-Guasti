@@ -903,11 +903,10 @@ textarea{resize:none;min-height:90px;}
       Premi il bottone rosso oppure tocca la mappa
     </div>
     <div class="map-legend" id="map-legend">
-      <div class="legend-title">Zone</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#e63946"></div>MVT</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#f77f00"></div>Cedrino</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#2d6a4f"></div>Posada Nord</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#457b9d"></div>Posada Sud</div>
+      <div class="legend-title">Interventi</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#e63946"></div>Aperto</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#58a6ff"></div>In carico</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#3fb950"></div>Risolto</div>
     </div>
     <div class="segnalazioni-btn" id="seg-btn" onclick="openInterventi()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -1040,6 +1039,13 @@ textarea{resize:none;min-height:90px;}
       <button class="filter-btn active" id="f-tutti" onclick="filterInterventi('tutti')">Tutti</button>
       <button class="filter-btn" id="f-aperti" onclick="filterInterventi('aperti')">Aperti</button>
       <button class="filter-btn" id="f-risolti" onclick="filterInterventi('risolti')">Risolti</button>
+    </div>
+    <div class="interventi-filter" style="margin-top:-4px">
+      <button class="filter-btn active" id="f-zona-tutti" onclick="filterZona('tutti')" style="font-size:11px">Tutte le zone</button>
+      <button class="filter-btn" id="f-zona-MVT" onclick="filterZona('MVT')" style="font-size:11px">MVT</button>
+      <button class="filter-btn" id="f-zona-CEDRINO" onclick="filterZona('CEDRINO')" style="font-size:11px">Cedrino</button>
+      <button class="filter-btn" id="f-zona-POSADA_NORD" onclick="filterZona('POSADA_NORD')" style="font-size:11px">P.Nord</button>
+      <button class="filter-btn" id="f-zona-POSADA_SUD" onclick="filterZona('POSADA_SUD')" style="font-size:11px">P.Sud</button>
     </div>
     <div id="interventi-list"></div>
   </div>
@@ -2019,18 +2025,21 @@ async function loadStats() {
     var docs  = data.documents || [];
     var respA = await fetch(FB_BASE + '/segnalazioni?pageSize=1000');
     var dataA = await respA.json();
-    var active = (dataA.documents || []).filter(function(d) {
+    var allSegs = dataA.documents || [];
+    var active = allSegs.filter(function(d) {
       var stato = d.fields?.stato?.stringValue || 'APERTO';
       return stato === 'APERTO' || stato === 'PRESO_IN_CARICO';
     });
-    renderStats(docs, active.length);
+    renderStats(docs, active.length, allSegs);
   } catch(e) {
     document.getElementById('stats-body').innerHTML = '<div class="stats-empty">Errore caricamento statistiche</div>';
   }
 }
 
-function renderStats(docs, activeCount) {
+function renderStats(docs, activeCount, allSegs) {
   var now = new Date(), thisYear = now.getFullYear(), thisMonth = now.getMonth();
+
+  // Records storico (per grafici e tempo medio)
   var records = docs.map(function(d) {
     var f = d.fields;
     return {
@@ -2043,20 +2052,36 @@ function renderStats(docs, activeCount) {
       durata_ore: parseFloat(f.durata_ore?.doubleValue || f.durata_ore?.integerValue || '-1')
     };
   });
-  var yearRecords  = records.filter(function(r) { return r.anno === thisYear; });
-  var monthRecords = records.filter(function(r) { return r.anno === thisYear && r.mese === thisMonth + 1; });
-  var totAnno = yearRecords.length, totMese = monthRecords.length;
-  var risolte = records.filter(function(r) { return r.stato === 'RISOLTO'; }).length;
+
+  // Tutte le segnalazioni (per KPI corretti)
+  var tutteSegs = (allSegs || []).map(function(d) {
+    var f = d.fields;
+    var ts = f.timestamp?.stringValue || '';
+    var d2 = ts ? new Date(ts) : null;
+    return {
+      tipo:     f.tipo?.stringValue || '',
+      zona:     f.zona?.stringValue || '',
+      stato:    f.stato?.stringValue || 'APERTO',
+      anno:     d2 ? d2.getFullYear() : 0,
+      mese:     d2 ? d2.getMonth() + 1 : 0
+    };
+  });
+
+  var yearSegs  = tutteSegs.filter(function(r) { return r.anno === thisYear; });
+  var monthSegs = tutteSegs.filter(function(r) { return r.anno === thisYear && r.mese === thisMonth + 1; });
+  var totAnno   = yearSegs.length;
+  var totMese   = monthSegs.length;
+  var risolte   = tutteSegs.filter(function(r) { return r.stato === 'RISOLTO'; }).length + records.length;
 
   var months = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
   var monthCounts = Array(12).fill(0);
-  yearRecords.forEach(function(r) { if (r.mese >= 1 && r.mese <= 12) monthCounts[r.mese-1]++; });
-  var maxMonth = Math.max(...monthCounts, 1);
+  yearSegs.forEach(function(r) { if (r.mese >= 1 && r.mese <= 12) monthCounts[r.mese-1]++; });
+  var maxMonth = Math.max.apply(null, monthCounts.concat([1]));
 
   var zoneCounts = {}, tipoCounts = {};
-  records.forEach(function(r) {
-    zoneCounts[r.zona] = (zoneCounts[r.zona]||0)+1;
-    tipoCounts[r.tipo] = (tipoCounts[r.tipo]||0)+1;
+  tutteSegs.forEach(function(r) {
+    if (r.zona) zoneCounts[r.zona] = (zoneCounts[r.zona]||0)+1;
+    if (r.tipo) tipoCounts[r.tipo] = (tipoCounts[r.tipo]||0)+1;
   });
   var totalZone = Object.values(zoneCounts).reduce(function(a,b){return a+b;},0) || 1;
   var totalTipo = Object.values(tipoCounts).reduce(function(a,b){return a+b;},0) || 1;
@@ -2081,7 +2106,7 @@ function renderStats(docs, activeCount) {
   html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--green)">'  + risolte     + '</div><div class="kpi-label">Risolte totali</div></div>';
   html += '</div>';
 
-  if (records.length === 0) {
+  if (tutteSegs.length === 0 && records.length === 0) {
     html += '<div class="stats-empty">Nessun dato storico disponibile ancora.<br>Le statistiche si popolano man mano che vengono risolte le segnalazioni.</div>';
     document.getElementById('stats-body').innerHTML = html;
     return;
@@ -2311,6 +2336,15 @@ function stampaPDF(id) {
 // LISTA INTERVENTI
 // ════════════════════════════════════════
 var _filtroAttivo = 'tutti';
+var _filtroZona   = 'tutti';
+
+function filterZona(zona) {
+  _filtroZona = zona;
+  document.querySelectorAll('[id^="f-zona-"]').forEach(function(b) { b.classList.remove('active'); });
+  var btn = document.getElementById('f-zona-' + zona);
+  if (btn) btn.classList.add('active');
+  renderListaInterventi();
+}
 
 function cercaPerCodice(query) {
   query = query.trim().toUpperCase();
@@ -2387,9 +2421,12 @@ function renderListaInterventi() {
     return (b.timestamp_display || '').localeCompare(a.timestamp_display || '');
   });
 
-  // Filtra
-  if (_filtroAttivo === 'aperti') segs = segs.filter(function(s) { return s.stato === 'APERTO'; });
+  // Filtra per stato
+  if (_filtroAttivo === 'aperti') segs = segs.filter(function(s) { return s.stato === 'APERTO' || s.stato === 'PRESO_IN_CARICO'; });
   if (_filtroAttivo === 'risolti') segs = segs.filter(function(s) { return s.stato === 'RISOLTO'; });
+
+  // Filtra per zona
+  if (_filtroZona !== 'tutti') segs = segs.filter(function(s) { return s.zona === _filtroZona; });
 
   if (segs.length === 0) {
     list.innerHTML = '<div class="interventi-empty">Nessun intervento ' + (_filtroAttivo !== 'tutti' ? _filtroAttivo : '') + '</div>';
