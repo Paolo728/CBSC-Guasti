@@ -1756,6 +1756,28 @@ async function sendTelegram(seg) {
   });
   if (!resp.ok) console.warn('Telegram error:', await resp.json());
   else console.log('Telegram inviato a zona:', seg.zona, 'chatId:', chatId);
+
+  // Manda foto direttamente come immagine
+  if (seg.foto && seg.foto.length > 0) {
+    for (var i = 0; i < seg.foto.length; i++) {
+      try {
+        var foto = seg.foto[i];
+        var byteStr = atob(foto.data);
+        var arr = new Uint8Array(byteStr.length);
+        for (var j = 0; j < byteStr.length; j++) arr[j] = byteStr.charCodeAt(j);
+        var blob = new Blob([arr], { type: foto.type || 'image/jpeg' });
+        var fd = new FormData();
+        fd.append('chat_id', chatId);
+        fd.append('photo', blob, 'foto.jpg');
+        fd.append('caption', '📷 Foto ' + (i+1) + ' — ' + (seg.codice||'') );
+        await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendPhoto', {
+          method: 'POST',
+          body: fd
+        });
+        console.log('Foto ' + (i+1) + ' inviata su Telegram');
+      } catch(e) { console.warn('Errore foto Telegram:', e); }
+    }
+  }
 }
 
 // ════════════════════════════════════════
