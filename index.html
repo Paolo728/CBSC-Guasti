@@ -1378,6 +1378,7 @@ function openFormAtPoint(lat, lng) {
     zb.style.color = ZONE_COLORS[selectedZona];
     zb.style.border = '1px solid ' + ZONE_COLORS[selectedZona] + '66';
   }
+  // NON sposta la mappa principale - mantieni zoom e posizione corrente
 }
 
 function closeForm() {
@@ -1669,15 +1670,42 @@ async function risolviSegnalazione(id) {
         iconSize: [20, 20], iconAnchor: [10, 10]
       });
       m.setIcon(newIcon);
-      // Forza refresh cluster
+      // Aggiorna popup con stato RISOLTO
+      var seg = m._segData;
+      var statoBadge = '<span style="background:#3fb95022;color:#3fb950;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #3fb950">RISOLTO</span>';
+      var prioBadge  = '<span style="background:' + (seg.priorita === 'ALTA' ? '#e63946' : seg.priorita === 'MEDIA' ? '#f0883e' : '#d29922') + ';color:white;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">' + (seg.priorita||'') + '</span>';
+      m.setPopupContent(
+        '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px;min-width:200px">' +
+        '<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:#58a6ff;margin-bottom:6px">' + (seg.codice||'N/D') + '</div>' +
+        '<div style="font-weight:600;margin-bottom:4px">' + seg.tipo + '</div>' +
+        '<div style="display:flex;gap:6px;margin-bottom:6px">' + prioBadge + ' ' + statoBadge + '</div>' +
+        '<div style="color:#8b949e;font-size:11px;margin-bottom:2px">' + seg.zona_label + '</div>' +
+        '<div style="color:#8b949e;font-size:11px;margin-bottom:6px">' + seg.timestamp_display + '</div>' +
+        '<div style="color:#3fb950;font-size:12px;text-align:center">✓ Intervento chiuso</div>' +
+        '</div>'
+      );
       clusterGroup.refreshClusters(m);
     }
     showToast('Intervento ' + (segMarkers[id]?._segData?.codice || '') + ' chiuso', 'success');
     var segData = segMarkers[id]?._segData || {};
     salvaInStorico(segData);
-    // Aggiorna stato su Sheets
+    updateSegCount();
+    // Aggiorna Sheets
     if (SHEETS_WEBHOOK_URL) {
       sendToSheets(Object.assign({}, segData, { stato: 'RISOLTO', _action: 'update' })).catch(function(){});
+    }
+    // Telegram chiusura
+    var chatId = TG_CHATS[segData.zona];
+    if (chatId && TG_TOKEN) {
+      fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: '✅ *INTERVENTO CHIUSO*\n\n📋 *Codice:* `' + (segData.codice||'N/D') + '`\n🔧 *Tipo:* ' + (segData.tipo||'') + '\n📍 *Zona:* ' + (segData.zona_label||'') + '\n🕐 *Chiuso il:* ' + new Date().toLocaleString('it-IT'),
+          parse_mode: 'Markdown'
+        })
+      }).catch(function(){});
     }
   } catch(e) {
     showToast('Errore chiusura segnalazione', 'error');
@@ -1900,12 +1928,13 @@ function renderStats(docs, activeCount) {
   var records = docs.map(function(d) {
     var f = d.fields;
     return {
-      tipo:     f.tipo?.stringValue || '',
-      priorita: f.priorita?.stringValue || '',
-      zona:     f.zona?.stringValue || '',
-      mese:     parseInt(f.mese?.integerValue || '0'),
-      anno:     parseInt(f.anno?.integerValue || '0'),
-      stato:    f.stato?.stringValue || ''
+      tipo:       f.tipo?.stringValue || '',
+      priorita:   f.priorita?.stringValue || '',
+      zona:       f.zona?.stringValue || '',
+      mese:       parseInt(f.mese?.integerValue || '0'),
+      anno:       parseInt(f.anno?.integerValue || '0'),
+      stato:      f.stato?.stringValue || '',
+      durata_ore: parseFloat(f.durata_ore?.doubleValue || '0')
     };
   });
   var yearRecords  = records.filter(function(r) { return r.anno === thisYear; });
@@ -1980,6 +2009,37 @@ function renderStats(docs, activeCount) {
   html += '<div class="donut-card"><h3>Per tipo</h3>' + buildDonut(tipoCounts, tipoColMap, tipoKeys, totalTipo, null) + '</div>';
   html += '</div>';
 
+  // Tempo medio per tipologia
+  var tipoTempi = {};
+  records.forEach(function(r) {
+    if (r.tipo && r.durata_ore > 0) {
+      if (!tipoTempi[r.tipo]) tipoTempi[r.tipo] = { somma: 0, count: 0 };
+      tipoTempi[r.tipo].somma += r.durata_ore;
+      tipoTempi[r.tipo].count += 1;
+    }
+  });
+  var tipiConTempi = Object.keys(tipoTempi);
+  if (tipiConTempi.length > 0) {
+    html += '<div class="stats-section"><h3>⏱ Tempo medio risoluzione</h3>';
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+    tipiConTempi.forEach(function(tipo, idx) {
+      var media = tipoTempi[tipo].somma / tipoTempi[tipo].count;
+      var label = media < 1
+        ? Math.round(media * 60) + ' min'
+        : media < 24
+          ? media.toFixed(1) + ' ore'
+          : (media / 24).toFixed(1) + ' gg';
+      var colore = tipoColors[idx % tipoColors.length];
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--dark3);border-radius:8px;border:1px solid var(--border)">' +
+        '<div style="width:8px;height:8px;border-radius:50%;background:' + colore + ';flex-shrink:0"></div>' +
+        '<span style="font-size:12px;flex:1;color:var(--text)">' + tipo + '</span>' +
+        '<span style="font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:700;color:var(--accent)">' + label + '</span>' +
+        '<span style="font-size:11px;color:var(--text3);margin-left:4px">(' + tipoTempi[tipo].count + ')</span>' +
+        '</div>';
+    });
+    html += '</div></div>';
+  }
+
   document.getElementById('stats-body').innerHTML = html;
 }
 
@@ -2016,6 +2076,9 @@ function buildDonut(counts, colors, keys, total, labels) {
 // ════════════════════════════════════════
 async function salvaInStorico(seg) {
   var d = new Date(seg.timestamp || Date.now());
+  var chiusuraTs = Date.now();
+  var aperturaTs = seg.timestamp ? new Date(seg.timestamp).getTime() : chiusuraTs;
+  var durata_ore = Math.round((chiusuraTs - aperturaTs) / 1000 / 60 / 60 * 10) / 10; // ore con 1 decimale
   var body = { fields: {
     tipo:              { stringValue: seg.tipo || '' },
     priorita:          { stringValue: seg.priorita || '' },
@@ -2025,7 +2088,8 @@ async function salvaInStorico(seg) {
     anno:              { integerValue: String(d.getFullYear()) },
     mese:              { integerValue: String(d.getMonth() + 1) },
     giorno:            { integerValue: String(d.getDate()) },
-    timestamp_display: { stringValue: seg.timestamp_display || '' }
+    timestamp_display: { stringValue: seg.timestamp_display || '' },
+    durata_ore:        { doubleValue: durata_ore }
   }};
   try {
     await fetch(FB_BASE + '/storico', {
