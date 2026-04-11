@@ -1302,12 +1302,6 @@ function initApp() {
   }
 
   map.on('click', function(e) {
-    // Su mobile usa sempre il GPS, non il tap
-    var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) {
-      showToast('Usa il bottone rosso per segnalare', '');
-      return;
-    }
     openFormAtPoint(e.latlng.lat, e.latlng.lng);
   });
 
