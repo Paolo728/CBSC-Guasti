@@ -2210,10 +2210,24 @@ function buildDonut(counts, colors, keys, total, labels) {
 // ════════════════════════════════════════
 async function salvaInStorico(seg) {
   var now = Date.now();
-  var aperturaTs = seg.timestamp ? new Date(seg.timestamp).getTime() : now;
+  var aperturaTs = 0;
+  if (seg.timestamp) {
+    aperturaTs = new Date(seg.timestamp).getTime();
+  } else if (seg.timestamp_display) {
+    // Fallback: parse da "11/04/2026, 13:31:21"
+    try {
+      var parts = seg.timestamp_display.split(', ');
+      var dateParts = parts[0].split('/');
+      var timeStr = parts[1] || '00:00:00';
+      aperturaTs = new Date(dateParts[2] + '-' + dateParts[1] + '-' + dateParts[0] + 'T' + timeStr).getTime();
+    } catch(e) { aperturaTs = now; }
+  } else {
+    aperturaTs = now;
+  }
   var durata_ore = Math.round((now - aperturaTs) / 1000 / 60 / 60 * 10) / 10;
+  if (durata_ore < 0) durata_ore = 0;
   var d = new Date(aperturaTs);
-  console.log('salvaInStorico - timestamp:', seg.timestamp, 'durata_ore:', durata_ore);
+  console.log('salvaInStorico - durata_ore:', durata_ore, 'apertura:', new Date(aperturaTs).toLocaleString('it-IT'));
   var body = { fields: {
     tipo:              { stringValue: seg.tipo || '' },
     priorita:          { stringValue: seg.priorita || '' },
