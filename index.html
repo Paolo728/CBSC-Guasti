@@ -1308,6 +1308,7 @@ function initApp() {
   });
 
   map.on('click', function(e) {
+    if (_gpsButtonClicked) return;
     openFormAtPoint(e.latlng.lat, e.latlng.lng);
   });
 
@@ -1825,7 +1826,11 @@ async function sendTelegram(seg) {
 // ════════════════════════════════════════
 // GPS
 // ════════════════════════════════════════
+var _gpsButtonClicked = false;
+
 function toggleGps() {
+  _gpsButtonClicked = true;
+  setTimeout(function() { _gpsButtonClicked = false; }, 500);
   var btn = document.getElementById('gps-btn');
   if (!navigator.geolocation) { showToast('GPS non disponibile', 'error'); return; }
   if (geoActive) {
