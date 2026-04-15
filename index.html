@@ -2398,19 +2398,15 @@ function stampaPDF(id) {
 
     '</div>' +
 
-    // Operatori, Materiali, Attrezzature su tre colonne
-    '<div class="three-col">' +
-
+    // Operatori, Materiali, Attrezzature uno sotto l'altro
     '<div class="section"><div class="section-title">Operatori</div>' +
-    '<div class="box">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
+    '<div class="box" style="min-height:40px">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
 
     '<div class="section"><div class="section-title">Materiali utilizzati</div>' +
-    '<div class="box"></div></div>' +
+    '<div class="box" style="min-height:40px"></div></div>' +
 
     '<div class="section"><div class="section-title">Attrezzature e mezzi d\'opera</div>' +
-    '<div class="box"></div></div>' +
-
-    '</div>' +
+    '<div class="box" style="min-height:40px"></div></div>' +
 
     // Firme in fondo
     '<div class="firma-box">' +
