@@ -2332,24 +2332,27 @@ function stampaPDF(id) {
   var html = '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">' +
     '<title>Ordine di Lavoro ' + (seg.codice||'') + '</title>' +
     '<style>' +
-    'body{font-family:Arial,sans-serif;margin:0;padding:24px;color:#222;font-size:13px}' +
-    '.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0d47a1;padding-bottom:12px;margin-bottom:20px}' +
-    '.header-left h1{margin:0;font-size:20px;color:#0d47a1;font-weight:700}' +
-    '.header-left p{margin:2px 0;font-size:11px;color:#666}' +
-    '.codice-box{background:#0d47a1;color:white;padding:10px 20px;border-radius:8px;text-align:center}' +
-    '.codice-box .label{font-size:10px;letter-spacing:1px;opacity:0.8}' +
-    '.codice-box .value{font-size:22px;font-weight:700;letter-spacing:2px}' +
-    '.section{margin-bottom:16px}' +
-    '.section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:10px}' +
+    'body{font-family:Arial,sans-serif;margin:0;padding:16px;color:#222;font-size:12px}' +
+    '.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0d47a1;padding-bottom:10px;margin-bottom:14px}' +
+    '.header-left h1{margin:0;font-size:18px;color:#0d47a1;font-weight:700}' +
+    '.header-left p{margin:2px 0;font-size:10px;color:#666}' +
+    '.codice-box{background:#0d47a1;color:white;padding:8px 16px;border-radius:8px;text-align:center}' +
+    '.codice-box .label{font-size:9px;letter-spacing:1px;opacity:0.8}' +
+    '.codice-box .value{font-size:18px;font-weight:700;letter-spacing:2px}' +
+    '.section{margin-bottom:10px}' +
+    '.section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;padding-bottom:3px;margin-bottom:6px}' +
+    '.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}' +
+    '.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}' +
     'table{width:100%;border-collapse:collapse}' +
-    'td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}' +
-    'td:first-child{font-weight:600;color:#555;width:140px;font-size:12px}' +
-    '.badge{display:inline-block;padding:3px 10px;border-radius:4px;color:white;font-weight:700;font-size:12px}' +
-    '.footer{margin-top:24px;border-top:1px solid #eee;padding-top:12px;font-size:10px;color:#999;display:flex;justify-content:space-between}' +
-    '.firma-box{border:1px solid #ddd;border-radius:6px;padding:12px;margin-top:16px}' +
-    '.firma-box .label{font-size:10px;color:#999;margin-bottom:30px}' +
-    '.firma-line{border-top:1px solid #bbb;margin-top:8px;padding-top:4px;font-size:10px;color:#999;text-align:center}' +
-    '@media print{body{padding:0}.no-print{display:none}}' +
+    'td{padding:4px 8px;border-bottom:1px solid #f0f0f0;vertical-align:top}' +
+    'td:first-child{font-weight:600;color:#555;width:120px;font-size:11px}' +
+    '.badge{display:inline-block;padding:2px 8px;border-radius:4px;color:white;font-weight:700;font-size:11px}' +
+    '.box{border:1px solid #eee;border-radius:4px;min-height:45px;padding:6px;color:#ccc;font-size:10px}' +
+    '.firma-box{border:1px solid #ddd;border-radius:6px;padding:10px;margin-top:10px}' +
+    '.firma-box .label{font-size:9px;color:#999;margin-bottom:20px}' +
+    '.firma-line{border-top:1px solid #bbb;margin-top:6px;padding-top:3px;font-size:9px;color:#999;text-align:center}' +
+    '.footer{margin-top:10px;border-top:1px solid #eee;padding-top:8px;font-size:9px;color:#999;display:flex;justify-content:space-between}' +
+    '@media print{body{padding:8px}.no-print{display:none}*{-webkit-print-color-adjust:exact}}' +
     '</style></head><body>' +
 
     // Header
@@ -2364,53 +2367,70 @@ function stampaPDF(id) {
     '<div class="value">' + (seg.codice||'N/D') + '</div>' +
     '</div></div>' +
 
-    // Dati intervento
+    // Dati intervento + Localizzazione su due colonne
+    '<div class="two-col">' +
+
     '<div class="section"><div class="section-title">Dati intervento</div>' +
     '<table>' +
     '<tr><td>Tipo guasto</td><td><strong>' + (seg.tipo||'—') + '</strong></td></tr>' +
     '<tr><td>Priorità</td><td><span class="badge" style="background:' + prioColor + '">' + (seg.priorita||'—') + '</span></td></tr>' +
     '<tr><td>Stato</td><td><span class="badge" style="background:' + statoColor + '">' + (seg.stato||'—') + '</span></td></tr>' +
     '<tr><td>Zona</td><td>' + (seg.zona_label||'—') + '</td></tr>' +
-    '<tr><td>Descrizione</td><td>' + (seg.descrizione||'—') + '</td></tr>' +
     '<tr><td>Segnalato da</td><td>' + (seg.segnalato_da||'—') + '</td></tr>' +
     '<tr><td>Data / Ora</td><td>' + (seg.timestamp_display||'—') + '</td></tr>' +
+    (seg.preso_da ? '<tr><td>Preso in carico</td><td>' + seg.preso_da + '</td></tr>' : '') +
+    (seg.chiuso_da ? '<tr><td>Chiuso da</td><td>' + seg.chiuso_da + '</td></tr>' : '') +
     '</table></div>' +
 
-    // Coordinate
+    '<div>' +
     '<div class="section"><div class="section-title">Localizzazione</div>' +
     '<table>' +
-    '<tr><td>Coordinate</td><td style="font-family:monospace">' + (seg.lat ? seg.lat.toFixed(6) : '—') + ', ' + (seg.lng ? seg.lng.toFixed(6) : '—') + '</td></tr>' +
-    '<tr><td>Google Maps</td><td><a href="' + mapsUrl + '" style="color:#1a73e8">' + mapsUrl + '</a></td></tr>' +
+    '<tr><td>Coordinate</td><td style="font-family:monospace;font-size:10px">' + (seg.lat ? seg.lat.toFixed(6) : '—') + ', ' + (seg.lng ? seg.lng.toFixed(6) : '—') + '</td></tr>' +
+    '<tr><td>Google Maps</td><td><a href="' + mapsUrl + '" style="color:#1a73e8;font-size:10px">Apri mappa</a></td></tr>' +
     '</table></div>' +
 
-    // Firma operatore
-    '<div class="firma-box">' +
-    '<div class="label">Firma operatore incaricato</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">' +
-    '<div><div class="firma-line">Nome e cognome</div></div>' +
-    '<div><div class="firma-line">Firma</div></div>' +
-    '</div>' +
-    '<div style="margin-top:12px"><div class="firma-line">Data intervento _________________________ Ora fine _____________</div></div>' +
+    '<div class="section"><div class="section-title">Descrizione</div>' +
+    '<div class="box" style="min-height:35px;color:#222">' + (seg.descrizione||'—') + '</div></div>' +
+
+    '<div class="section"><div class="section-title">Note intervento</div>' +
+    '<div class="box"></div></div>' +
     '</div>' +
 
-    // Note
-    '<div class="section" style="margin-top:16px"><div class="section-title">Note intervento</div>' +
-    '<div style="border:1px solid #eee;border-radius:6px;height:60px;padding:8px;color:#ccc;font-size:11px">Spazio per note aggiuntive...</div></div>' +
+    '</div>' +
 
-    // Operatori
+    // Operatori, Materiali, Attrezzature su tre colonne
+    '<div class="three-col">' +
+
     '<div class="section"><div class="section-title">Operatori</div>' +
-    '<div style="border:1px solid #eee;border-radius:6px;min-height:50px;padding:8px">' +
-    (seg.preso_da ? '<div style="font-size:12px;margin-bottom:4px">👤 ' + seg.preso_da + '</div>' : '') +
-    '<div style="color:#ccc;font-size:11px">Aggiungere altri operatori coinvolti...</div>' +
+    '<div class="box">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
+
+    '<div class="section"><div class="section-title">Materiali utilizzati</div>' +
+    '<div class="box"></div></div>' +
+
+    '<div class="section"><div class="section-title">Attrezzature e mezzi d\'opera</div>' +
+    '<div class="box"></div></div>' +
+
+    '</div>' +
+
+    // Firme in fondo
+    '<div class="firma-box">' +
+    '<div class="label">Firme</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px">' +
+    '<div><div class="firma-line">Operatore incaricato</div></div>' +
+    '<div><div class="firma-line">Responsabile di zona</div></div>' +
+    '<div><div class="firma-line">Data e ora fine intervento</div></div>' +
     '</div></div>' +
 
-    // Materiali
-    '<div class="section"><div class="section-title">Materiali utilizzati</div>' +
-    '<div style="border:1px solid #eee;border-radius:6px;min-height:60px;padding:8px;color:#ccc;font-size:11px">Elenco materiali utilizzati...</div></div>' +
+    // Footer
+    '<div class="footer">' +
+    '<span>CBSC — Segnalazioni Guasti &nbsp;|&nbsp; ' + (seg.codice||'') + '</span>' +
+    '<span>Generato il ' + new Date().toLocaleString('it-IT') + '</span>' +
+    '</div>' +
 
-    // Attrezzature
-    '<div class="section"><div class="section-title">Attrezzature e mezzi d\'opera</div>' +
-    '<div style="border:1px solid #eee;border-radius:6px;min-height:60px;padding:8px;color:#ccc;font-size:11px">Elenco attrezzature e mezzi d\'opera utilizzati...</div></div>' +
+    '<div class="no-print" style="margin-top:16px;text-align:center">' +
+    '<button onclick="window.print()" style="padding:10px 30px;background:#0d47a1;color:white;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Stampa / Salva PDF</button>' +
+    '</div>' +
+    '</body></html>'; +
 
     // Footer
     '<div class="footer">' +
