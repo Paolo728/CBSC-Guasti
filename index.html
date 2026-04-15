@@ -1091,7 +1091,7 @@ textarea{resize:none;min-height:90px;}
       </svg>
     </div>
     <div class="modal-title">Accesso riservato</div>
-    <div class="modal-sub">Inserisci il PIN dirigenziale per chiudere questa segnalazione</div>
+    <div class="modal-sub" id="modal-sub">Inserisci il PIN dirigenziale per chiudere questa segnalazione</div>
     <input type="password" class="modal-input" id="pin-input" placeholder="• • • •" maxlength="6"
       oninput="this.classList.remove('error')" onkeypress="if(event.key==='Enter') confirmPin()">
     <div class="modal-err" id="pin-err">PIN errato. Riprovare.</div>
@@ -1210,6 +1210,7 @@ const PIN_CHIUSURA = '1708';
 var currentUser = '';
 var currentRuolo = '';
 var pendingCloseId = null;  // id segnalazione da chiudere
+var pendingAction  = 'chiudi'; // 'chiudi' o 'carico'
 
 // ════════════════════════════════════════
 // AUTH
@@ -1670,12 +1671,14 @@ function addMarkerToMap(seg) {
   marker._color = color;
 }
 
-// ── PIN CHIUSURA ──
+// ── PIN CHIUSURA / PRESA IN CARICO ──
 function richiesPinChiusura(id) {
   pendingCloseId = id;
+  pendingAction  = 'chiudi';
   document.getElementById('pin-input').value = '';
   document.getElementById('pin-input').classList.remove('error');
   document.getElementById('pin-err').style.display = 'none';
+  document.getElementById('modal-sub').textContent = 'Inserisci il PIN dirigenziale per chiudere questa segnalazione';
   document.getElementById('pin-modal').classList.add('show');
   setTimeout(function() { document.getElementById('pin-input').focus(); }, 300);
 }
@@ -1683,14 +1686,20 @@ function richiesPinChiusura(id) {
 function closePin() {
   document.getElementById('pin-modal').classList.remove('show');
   pendingCloseId = null;
+  pendingAction  = 'chiudi';
 }
 
 function confirmPin() {
   var entered = document.getElementById('pin-input').value.trim();
   if (entered === PIN_CHIUSURA) {
     document.getElementById('pin-modal').classList.remove('show');
-    risolviSegnalazione(pendingCloseId);
+    if (pendingAction === 'carico') {
+      eseguiPresaInCarico(pendingCloseId);
+    } else {
+      risolviSegnalazione(pendingCloseId);
+    }
     pendingCloseId = null;
+    pendingAction  = 'chiudi';
   } else {
     document.getElementById('pin-input').classList.add('error');
     document.getElementById('pin-err').style.display = 'block';
@@ -1699,8 +1708,19 @@ function confirmPin() {
 }
 
 async function prendiInCarico(id) {
-  var nome = prompt('Inserisci il tuo nome:');
-  if (!nome) return;
+  // Usa il PIN modal esistente
+  pendingCloseId = id;
+  pendingAction = 'carico';
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-input').classList.remove('error');
+  document.getElementById('pin-err').style.display = 'none';
+  document.getElementById('modal-sub').textContent = 'Inserisci il PIN per prendere in carico';
+  document.getElementById('pin-modal').classList.add('show');
+  setTimeout(function() { document.getElementById('pin-input').focus(); }, 300);
+}
+
+async function eseguiPresaInCarico(id) {
+  var nome = currentUser || 'N/D';
   try {
     var url = FB_BASE + '/segnalazioni/' + id + '?updateMask.fieldPaths=stato&updateMask.fieldPaths=preso_da';
     await fetch(url, {
@@ -1731,7 +1751,6 @@ async function prendiInCarico(id) {
       var segData = segMarkers[id]?._segData || {};
       sendToSheets(Object.assign({}, segData, { stato: 'PRESO_IN_CARICO', preso_da: nome, _action: 'update' })).catch(function(){});
     }
-    // Telegram notifica
     var segData2 = segMarkers[id]?._segData || {};
     var chatId = TG_CHATS[segData2.zona];
     if (chatId) {
