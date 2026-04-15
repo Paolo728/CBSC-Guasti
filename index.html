@@ -1099,6 +1099,10 @@ textarea{resize:none;min-height:90px;}
     </div>
     <div class="modal-title">Accesso riservato</div>
     <div class="modal-sub" id="modal-sub">Inserisci il PIN dirigenziale per chiudere questa segnalazione</div>
+    <div id="operatore-field" style="display:none;width:100%;margin-bottom:10px">
+      <input type="text" class="modal-input" id="operatore-input" placeholder="Nome operatore assegnato"
+        style="font-size:14px;letter-spacing:0" maxlength="50">
+    </div>
     <input type="password" class="modal-input" id="pin-input" placeholder="• • • •" maxlength="6"
       oninput="this.classList.remove('error')" onkeypress="if(event.key==='Enter') confirmPin()">
     <div class="modal-err" id="pin-err">PIN errato. Riprovare.</div>
@@ -1695,12 +1699,14 @@ function richiesPinChiusura(id) {
   document.getElementById('pin-input').classList.remove('error');
   document.getElementById('pin-err').style.display = 'none';
   document.getElementById('modal-sub').textContent = 'Inserisci il PIN dirigenziale per chiudere questa segnalazione';
+  document.getElementById('operatore-field').style.display = 'none';
   document.getElementById('pin-modal').classList.add('show');
   setTimeout(function() { document.getElementById('pin-input').focus(); }, 300);
 }
 
 function closePin() {
   document.getElementById('pin-modal').classList.remove('show');
+  document.getElementById('operatore-field').style.display = 'none';
   pendingCloseId = null;
   pendingAction  = 'chiudi';
 }
@@ -1724,19 +1730,20 @@ function confirmPin() {
 }
 
 async function prendiInCarico(id) {
-  // Usa il PIN modal esistente
   pendingCloseId = id;
   pendingAction = 'carico';
   document.getElementById('pin-input').value = '';
   document.getElementById('pin-input').classList.remove('error');
   document.getElementById('pin-err').style.display = 'none';
-  document.getElementById('modal-sub').textContent = 'Inserisci il PIN per prendere in carico';
+  document.getElementById('modal-sub').textContent = 'Inserisci il nome dell\'operatore e il PIN';
+  document.getElementById('operatore-field').style.display = 'block';
+  document.getElementById('operatore-input').value = currentUser;
   document.getElementById('pin-modal').classList.add('show');
-  setTimeout(function() { document.getElementById('pin-input').focus(); }, 300);
+  setTimeout(function() { document.getElementById('operatore-input').focus(); }, 300);
 }
 
 async function eseguiPresaInCarico(id) {
-  var nome = currentUser || 'N/D';
+  var nome = document.getElementById('operatore-input').value.trim() || currentUser || 'N/D';
   try {
     var url = FB_BASE + '/segnalazioni/' + id + '?updateMask.fieldPaths=stato&updateMask.fieldPaths=preso_da';
     await fetch(url, {
@@ -2389,6 +2396,21 @@ function stampaPDF(id) {
     // Note
     '<div class="section" style="margin-top:16px"><div class="section-title">Note intervento</div>' +
     '<div style="border:1px solid #eee;border-radius:6px;height:60px;padding:8px;color:#ccc;font-size:11px">Spazio per note aggiuntive...</div></div>' +
+
+    // Operatori
+    '<div class="section"><div class="section-title">Operatori</div>' +
+    '<div style="border:1px solid #eee;border-radius:6px;min-height:50px;padding:8px">' +
+    (seg.preso_da ? '<div style="font-size:12px;margin-bottom:4px">👤 ' + seg.preso_da + '</div>' : '') +
+    '<div style="color:#ccc;font-size:11px">Aggiungere altri operatori coinvolti...</div>' +
+    '</div></div>' +
+
+    // Materiali
+    '<div class="section"><div class="section-title">Materiali utilizzati</div>' +
+    '<div style="border:1px solid #eee;border-radius:6px;min-height:60px;padding:8px;color:#ccc;font-size:11px">Elenco materiali utilizzati...</div></div>' +
+
+    // Attrezzature
+    '<div class="section"><div class="section-title">Attrezzature e mezzi d\'opera</div>' +
+    '<div style="border:1px solid #eee;border-radius:6px;min-height:60px;padding:8px;color:#ccc;font-size:11px">Elenco attrezzature e mezzi d\'opera utilizzati...</div></div>' +
 
     // Footer
     '<div class="footer">' +
