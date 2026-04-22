@@ -1774,16 +1774,6 @@ async function eseguiPresaInCarico(id) {
       var segData = segMarkers[id]?._segData || {};
       sendToSheets(Object.assign({}, segData, { stato: 'PRESO_IN_CARICO', preso_da: nome, _action: 'update' })).catch(function(){});
     }
-    var segData2 = segMarkers[id]?._segData || {};
-    var chatId = TG_CHATS[segData2.zona];
-    if (chatId) {
-      fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, parse_mode: 'Markdown',
-          text: '🔵 *PRESO IN CARICO*\n\n📋 *Codice:* `' + (segData2.codice||'N/D') + '`\n👤 *Operatore:* ' + nome + '\n🔧 *Tipo:* ' + (segData2.tipo||'') + '\n📍 *Zona:* ' + (segData2.zona_label||'')
-        })
-      }).catch(function(){});
-    }
   } catch(e) {
     showToast('Errore presa in carico', 'error');
   }
@@ -1838,19 +1828,6 @@ async function risolviSegnalazione(id) {
     updateSegCount();
     if (SHEETS_WEBHOOK_URL) {
       sendToSheets(Object.assign({}, segData, { stato: 'RISOLTO', chiuso_da: chiusoDa, chiuso_il: chiusoIl, _action: 'update' })).catch(function(){});
-    }
-    // Telegram chiusura
-    var chatId = TG_CHATS[segData.zona];
-    if (chatId && TG_TOKEN) {
-      fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: '✅ *INTERVENTO CHIUSO*\n\n📋 *Codice:* `' + (segData.codice||'N/D') + '`\n🔧 *Tipo:* ' + (segData.tipo||'') + '\n📍 *Zona:* ' + (segData.zona_label||'') + '\n👤 *Chiuso da:* ' + chiusoDa + '\n🕐 *' + chiusoIl + '*',
-          parse_mode: 'Markdown'
-        })
-      }).catch(function(){});
     }
   } catch(e) {
     showToast('Errore chiusura segnalazione', 'error');
@@ -1916,7 +1893,8 @@ async function sendTelegram(seg) {
   if (!chatId) { console.log('Nessun chatId per zona:', seg.zona); return; }
   var prioEmoji = seg.priorita === 'ALTA' ? '🔴' : seg.priorita === 'MEDIA' ? '🟡' : '🟢';
   var mapsUrl   = 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng;
-  var text = '🚨 *NUOVA SEGNALAZIONE GUASTO*\n\n' +
+  var tipoUpper = (seg.tipo || 'NUOVO GUASTO').toUpperCase();
+  var text = '🚨 *' + tipoUpper + '*\n\n' +
     '📋 *Codice:* `' + (seg.codice||'N/D') + '`\n' +
     prioEmoji + ' *Priorità:* ' + seg.priorita + '\n' +
     '🔧 *Tipo:* ' + seg.tipo + '\n' +
@@ -2400,13 +2378,13 @@ function stampaPDF(id) {
 
     // Operatori, Materiali, Attrezzature uno sotto l'altro
     '<div class="section"><div class="section-title">Operatori</div>' +
-    '<div class="box" style="min-height:40px">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
+    '<div class="box" style="min-height:70px">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
 
     '<div class="section"><div class="section-title">Materiali utilizzati</div>' +
-    '<div class="box" style="min-height:40px"></div></div>' +
+    '<div class="box" style="min-height:70px"></div></div>' +
 
     '<div class="section"><div class="section-title">Attrezzature e mezzi d\'opera</div>' +
-    '<div class="box" style="min-height:40px"></div></div>' +
+    '<div class="box" style="min-height:70px"></div></div>' +
 
     // Firme in fondo
     '<div class="firma-box">' +
