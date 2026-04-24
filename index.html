@@ -2348,15 +2348,15 @@ function stampaPDF(id) {
     '.codice-box .label{font-size:9px;letter-spacing:1px;opacity:0.8}' +
     '.codice-box .value{font-size:18px;font-weight:700;letter-spacing:2px}' +
     '.section{margin-bottom:10px}' +
-    '.section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;padding-bottom:3px;margin-bottom:6px}' +
+    '.section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:2px solid #ccc;padding-bottom:3px;margin-bottom:6px}' +
     '.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}' +
     '.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}' +
     'table{width:100%;border-collapse:collapse}' +
     'td{padding:4px 8px;border-bottom:1px solid #f0f0f0;vertical-align:top}' +
     'td:first-child{font-weight:600;color:#555;width:120px;font-size:11px}' +
     '.badge{display:inline-block;padding:2px 8px;border-radius:4px;color:white;font-weight:700;font-size:11px}' +
-    '.box{border:1px solid #eee;border-radius:4px;min-height:45px;padding:6px;color:#ccc;font-size:10px}' +
-    '.firma-box{border:1px solid #ddd;border-radius:6px;padding:10px;margin-top:10px}' +
+    '.box{border:2px solid #999;border-radius:4px;min-height:45px;padding:6px;color:#ccc;font-size:10px}' +
+    '.firma-box{border:2px solid #999;border-radius:6px;padding:10px;margin-top:10px}' +
     '.firma-box .label{font-size:9px;color:#999;margin-bottom:20px}' +
     '.firma-line{border-top:1px solid #bbb;margin-top:6px;padding-top:3px;font-size:9px;color:#999;text-align:center}' +
     '.footer{margin-top:10px;border-top:1px solid #eee;padding-top:8px;font-size:9px;color:#999;display:flex;justify-content:space-between}' +
@@ -2388,6 +2388,7 @@ function stampaPDF(id) {
     '<tr><td>Data / Ora</td><td>' + (seg.timestamp_display||'—') + '</td></tr>' +
     (seg.preso_da ? '<tr><td>Preso in carico</td><td>' + seg.preso_da + '</td></tr>' : '') +
     (seg.chiuso_da ? '<tr><td>Chiuso da</td><td>' + seg.chiuso_da + '</td></tr>' : '') +
+    (seg.elemento_tipo ? '<tr><td>Elemento rete</td><td><strong>' + seg.elemento_tipo + '</strong> — ' + (seg.elemento_rete||'') + (seg.elemento_diametro?' Ø'+seg.elemento_diametro+'mm':'') + (seg.elemento_materiale?' '+seg.elemento_materiale:'') + (seg.elemento_comizio?' (Comizio: '+seg.elemento_comizio+')':'') + '</td></tr>' : '') +
     '</table></div>' +
 
     '<div>' +
