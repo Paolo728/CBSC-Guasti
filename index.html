@@ -2715,16 +2715,22 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
         var c = geom.coordinates;
         if (!c) return;
         var ll = [c[1], c[0]];
+        // Cerchio visibile
         var mk = L.circleMarker(ll, { radius:8, color:'#444', weight:2, fillColor:'#ffffff', fillOpacity:0.95, bubblingMouseEvents:false });
+        // Cerchio invisibile grande per touch area mobile
+        var mkTouch = L.circleMarker(ll, { radius:20, color:'transparent', weight:0, fillColor:'transparent', fillOpacity:0, bubblingMouseEvents:false });
         mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">Idrante</b><br>ID: ' + nome + (row.comizio ? '<br>Comizio: ' + row.comizio : '') + '</div>', { maxWidth:220 });
         mk._reteData = { tipo:'Idrante', nome:nome, table:'idranti', comizio:row.comizio||'' };
-        mk.on('click', function(e) {
+        var clickHandler = function(e) {
           L.DomEvent.stopPropagation(e);
           L.DomEvent.preventDefault(e);
           nearestReteElement = { tipo:'Idrante', nome:nome+' - '+(row.comizio||''), table:'idranti' };
           openFormAtPoint(ll[0], ll[1]);
-        });
+        };
+        mk.on('click', clickHandler);
+        mkTouch.on('click', clickHandler);
         reteLayerGroups[table].addLayer(mk);
+        reteLayerGroups[table].addLayer(mkTouch);
       } else {
         var st = { color:cfg.color, weight:cfg.weight, opacity:0.9 };
         if (cfg.dashArray) st.dashArray = cfg.dashArray;
