@@ -1503,6 +1503,21 @@ function inviaForm() {
     ttl: Date.now() + (7 * 24 * 60 * 60 * 1000)
   };
 
+  // Aggiungi dati elemento rete se presenti
+  var reteBox = document.getElementById('rete-info-box');
+  if (reteBox) {
+    var nomeEdit = document.getElementById('rete-nome-edit');
+    var diamEdit = document.getElementById('rete-diam-edit');
+    var matEdit  = document.getElementById('rete-mat-edit');
+    var comizioEdit = document.getElementById('rete-comizio-edit');
+    var tipoLabel = reteBox.querySelector('span[style*="font-weight:600"]');
+    seg.elemento_rete = nomeEdit ? nomeEdit.value : '';
+    seg.elemento_tipo = tipoLabel ? tipoLabel.textContent : '';
+    seg.elemento_diametro = diamEdit ? diamEdit.value : '';
+    seg.elemento_materiale = matEdit ? matEdit.value : '';
+    seg.elemento_comizio = comizioEdit ? comizioEdit.value : '';
+  }
+
   document.getElementById('sending-overlay').classList.add('show');
   document.getElementById('sending-text').textContent = 'Salvataggio e invio notifiche...';
   document.getElementById('btn-send').classList.add('loading');
@@ -1570,7 +1585,12 @@ async function saveToFirebase(seg) {
     timestamp:         { stringValue: seg.timestamp },
     timestamp_display: { stringValue: seg.timestamp_display },
     stato:             { stringValue: seg.stato },
-    ttl:               { integerValue: String(seg.ttl) }
+    ttl:               { integerValue: String(seg.ttl) },
+    elemento_rete:     { stringValue: seg.elemento_rete || '' },
+    elemento_tipo:     { stringValue: seg.elemento_tipo || '' },
+    elemento_diametro: { stringValue: seg.elemento_diametro || '' },
+    elemento_materiale:{ stringValue: seg.elemento_materiale || '' },
+    elemento_comizio:  { stringValue: seg.elemento_comizio || '' }
   }};
   var resp = await fetch(FB_BASE + '/segnalazioni', {
     method: 'POST',
@@ -1896,11 +1916,19 @@ async function sendTelegram(seg) {
   var prioEmoji = seg.priorita === 'ALTA' ? '🔴' : seg.priorita === 'MEDIA' ? '🟡' : '🟢';
   var mapsUrl   = 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng;
   var tipoUpper = (seg.tipo || 'NUOVO GUASTO').toUpperCase();
+  var reteInfo = '';
+  if (seg.elemento_tipo) {
+    reteInfo = '💧 *Elemento:* ' + seg.elemento_tipo + ' — ' + (seg.elemento_rete||'') +
+      (seg.elemento_diametro ? ' Ø'+seg.elemento_diametro+'mm' : '') +
+      (seg.elemento_materiale ? ' '+seg.elemento_materiale : '') +
+      (seg.elemento_comizio ? ' ('+seg.elemento_comizio+')' : '') + '\n';
+  }
   var text = '🚨 *' + tipoUpper + '*\n\n' +
     '📋 *Codice:* `' + (seg.codice||'N/D') + '`\n' +
     prioEmoji + ' *Priorità:* ' + seg.priorita + '\n' +
     '🔧 *Tipo:* ' + seg.tipo + '\n' +
     '📍 *Zona:* ' + seg.zona_label + '\n' +
+    reteInfo +
     '📝 *Descrizione:* ' + seg.descrizione + '\n' +
     '👤 *Segnalato da:* ' + seg.segnalato_da + '\n' +
     '🕐 *Data/ora:* ' + seg.timestamp_display + '\n\n' +
@@ -2740,17 +2768,45 @@ function injectReteInfo(lat, lng) {
   if (!info) return;
   var cfg = RETE_LAYERS[info.table] || {};
   var col = cfg.color || '#58a6ff';
+  var isIdrante = info.table === 'idranti';
+
+  var inputStyle = 'width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid ' + col + '44;border-radius:4px;color:#e6edf3;font-size:12px;padding:4px 8px;outline:none;font-family:Barlow,sans-serif;margin-bottom:6px';
+
+  var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#8b949e;margin-bottom:6px">Elemento rete</div>' +
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+    '<div style="width:10px;height:10px;background:' + col + ';border-radius:50%;flex-shrink:0"></div>' +
+    '<span style="font-weight:600;color:' + col + '">' + info.tipo + '</span>' +
+    '</div>';
+
+  if (isIdrante) {
+    // Per idranti: nome e comizio
+    var parti = (info.nome || '').split(' - ');
+    var nomeIdr = parti[0] || '';
+    var comizioIdr = parti[1] || '';
+    html += '<label style="font-size:10px;color:#8b949e">ID Idrante</label>' +
+      '<input id="rete-nome-edit" value="' + nomeIdr + '" style="' + inputStyle + '">' +
+      '<label style="font-size:10px;color:#8b949e">Comizio</label>' +
+      '<input id="rete-comizio-edit" value="' + comizioIdr + '" style="' + inputStyle + '">';
+  } else {
+    // Per condotte: nome, diametro, materiale
+    html += '<label style="font-size:10px;color:#8b949e">Nome condotta</label>' +
+      '<input id="rete-nome-edit" value="' + (info.nome || '') + '" style="' + inputStyle + '">';
+    if (info.diametro !== null && info.diametro !== undefined) {
+      html += '<label style="font-size:10px;color:#8b949e">Diametro (mm)</label>' +
+        '<input id="rete-diam-edit" value="' + (info.diametro || '') + '" style="' + inputStyle + '">';
+    }
+    if (info.materiale !== null && info.materiale !== undefined) {
+      html += '<label style="font-size:10px;color:#8b949e">Materiale</label>' +
+        '<input id="rete-mat-edit" value="' + (info.materiale || '') + '" style="' + inputStyle + '">';
+    }
+  }
+
+  html += '<div style="font-size:10px;color:#8b949e;margin-top:2px">✏️ Modifica i dati se non corretti</div>';
+
   var box = document.createElement('div');
   box.id = 'rete-info-box';
   box.style.cssText = 'background:rgba(13,17,23,0.6);border:1px solid ' + col + '55;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#e6edf3';
-  var extra = '';
-  if (info.diametro) extra += '<div><b style="color:#8b949e">Diam:</b> ' + info.diametro + ' mm</div>';
-  if (info.materiale) extra += '<div><b style="color:#8b949e">Mat:</b> ' + info.materiale + '</div>';
-  box.innerHTML = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#8b949e;margin-bottom:5px">Elemento rete</div>' +
-    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><div style="width:10px;height:10px;background:' + col + ';border-radius:50%"></div><span style="font-weight:600;color:' + col + '">' + info.tipo + '</span></div>' +
-    '<input id="rete-nome-edit" value="' + info.nome + '" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid ' + col + '44;border-radius:4px;color:#e6edf3;font-size:12px;padding:4px 8px;outline:none;font-family:Barlow,sans-serif;margin-bottom:4px">' +
-    extra +
-    '<div style="font-size:10px;color:#8b949e;margin-top:4px">Modifica il nome se non corretto</div>';
+  box.innerHTML = html;
   var fb = document.querySelector('.form-body');
   if (fb) fb.insertBefore(box, fb.firstChild);
 }
@@ -2758,6 +2814,7 @@ function injectReteInfo(lat, lng) {
 function findNearestRete(lat, lng) {
   var nearest = null, minD = Infinity;
   Object.keys(reteLayerGroups).forEach(function(t) {
+    if (t === 'idranti') return; // idranti si cliccano solo direttamente
     reteLayerGroups[t].eachLayer(function(l) {
       var ll = l.getLatLng ? l.getLatLng() : (l.getBounds ? l.getBounds().getCenter() : null);
       if (!ll) return;
