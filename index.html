@@ -2597,6 +2597,17 @@ function vaiAlMarker(id) {
 // ════════════════════════════════════════
 // SUPABASE KEEPALIVE (evita pausa progetto)
 // ════════════════════════════════════════
+// Header helper per tutte le chiamate Supabase
+function sbHeaders(type) {
+  var h = {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+    'Content-Type': 'application/json'
+  };
+  if (type === 'geo') h['Accept'] = 'application/geo+json';
+  return h;
+}
+
 function keepSupabaseAlive() {
   var KEY = 'sb_last_ping';
   var INTERVAL = 4 * 24 * 60 * 60 * 1000; // 4 giorni in ms
@@ -2605,7 +2616,7 @@ function keepSupabaseAlive() {
   if (now - last < INTERVAL) return; // ping recente, non serve
   // Fa una query leggera: conta solo 1 riga da idranti
   fetch(SB_URL + '/rest/v1/idranti?select=fid&limit=1', {
-    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+    headers: sbHeaders()
   }).then(function(r) {
     if (r.ok) {
       localStorage.setItem(KEY, String(now));
@@ -2622,11 +2633,11 @@ const SB_KEY = 'sb_publishable_UnjxyOFGqIM8pJIL1GSxgA_e2tUY2gK';
 const MIN_ZOOM_RETE = 14;
 
 const RETE_LAYERS = {
-  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', type:'line' },
-  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', type:'line' },
-  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', type:'line' },
-  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', type:'line' },
-  idranti:             { label:'Idranti',             color:'#ffffff', weight:1.5, nameField:'idrante', type:'point' }
+  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', diamField:'diametro', matField:'materiale', type:'line' },
+  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', diamField:'dn', matField:'materiale', type:'line' },
+  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', diamField:'dn', matField:'materiale', type:'line' },
+  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', diamField:'diametro', matField:null, type:'line' },
+  idranti:             { label:'Idranti',             color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point' }
 };
 
 var reteLayersVisible = { condotta_principale:true, condotta_secondaria:true, condotta_comiziale:true, ponti_tubo:true, idranti:true };
@@ -2667,16 +2678,16 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   if (reteCache[ck]) return;
   reteCache[ck] = true;
   var cfg = RETE_LAYERS[table];
-  var sel = 'fid,'+cfg.nameField+(table==='idranti'?',comizio':',diametro,materiale')+',geom';
-  // Usa RPC per query bbox — più compatibile con le nuove API keys
+  // Costruisce select con i campi reali della tabella
+  var selFields = ['fid', cfg.nameField];
+  if (cfg.diamField) selFields.push(cfg.diamField);
+  if (cfg.matField) selFields.push(cfg.matField);
+  if (table === 'idranti') selFields.push('comizio');
+  selFields.push('geom');
+  var sel = selFields.join(',');
   var url = SB_URL+'/rest/v1/'+table+'?select='+sel+'&limit=1500';
   try {
-    var r = await fetch(url, { headers:{
-      'apikey': SB_KEY,
-      'Authorization': 'Bearer '+SB_KEY,
-      'Accept': 'application/geo+json',
-      'Accept-Profile': 'public'
-    }});
+    var r = await fetch(url, { headers: sbHeaders('geo') });
     if (!r.ok) { console.warn('SB err',table,r.status, await r.text()); reteCache[ck]=false; return; }
     var gj = await r.json();
     if (!gj.features||gj.features.length===0) return;
@@ -2708,8 +2719,8 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
         var st = {color:cfg.color,weight:cfg.weight,opacity:0.9};
         if (cfg.dashArray) st.dashArray=cfg.dashArray;
         var gl = L.geoJSON(f,{style:st});
-        var diam = p.diametro?' Ø'+p.diametro+'mm':'';
-        var mat = p.materiale?' · '+p.materiale:'';
+        var diam = cfg.diamField && p[cfg.diamField] ? ' Ø'+p[cfg.diamField]+'mm' : '';
+        var mat = cfg.matField && p[cfg.matField] ? ' · '+p[cfg.matField] : '';
         gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:'+cfg.color+'">'+cfg.label+'</b><br>'+nome+diam+mat+'</div>',{maxWidth:220});
         gl.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:cfg.label,nome:nome,table:table};openFormAtPoint(e.latlng.lat,e.latlng.lng);});
         reteLayerGroups[table].addLayer(gl);
