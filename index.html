@@ -2759,7 +2759,7 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
 function buildReteToggleUI() {
   var div = document.createElement('div');
   div.id = 'rete-toggle';
-  div.style.cssText = 'position:absolute;bottom:calc(76px + env(safe-area-inset-bottom,0px));left:12px;background:rgba(13,17,23,0.92);border:1px solid #30363d;border-radius:12px;padding:8px 10px;z-index:500;font-family:Barlow,sans-serif;font-size:11px;min-width:155px;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
+  div.style.cssText = 'position:absolute;bottom:calc(130px + env(safe-area-inset-bottom,0px));left:12px;background:rgba(13,17,23,0.92);border:1px solid #30363d;border-radius:12px;padding:8px 10px;z-index:500;font-family:Barlow,sans-serif;font-size:11px;min-width:155px;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
   var dots = { condotta_principale:'width:18px;height:4px;background:#00dd00;border-radius:2px', condotta_secondaria:'width:18px;height:3px;background:#f0a500;border-radius:2px', condotta_comiziale:'width:18px;height:2px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 6px,transparent 6px,transparent 10px)', ponti_tubo:'width:18px;height:3px;background:#ff00cc;border-radius:2px', idranti:'width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid #555;flex-shrink:0' };
   var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;margin-bottom:7px">Rete idrica</div>';
   Object.keys(RETE_LAYERS).forEach(function(t) {
