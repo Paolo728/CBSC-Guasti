@@ -1510,9 +1510,9 @@ function inviaForm() {
     var diamEdit = document.getElementById('rete-diam-edit');
     var matEdit  = document.getElementById('rete-mat-edit');
     var comizioEdit = document.getElementById('rete-comizio-edit');
-    var tipoLabel = reteBox.querySelector('span[style*="font-weight:600"]');
+    var tipoEdit = document.getElementById('rete-tipo-edit');
     seg.elemento_rete = nomeEdit ? nomeEdit.value : '';
-    seg.elemento_tipo = tipoLabel ? tipoLabel.textContent : '';
+    seg.elemento_tipo = tipoEdit ? tipoEdit.value : '';
     seg.elemento_diametro = diamEdit ? diamEdit.value : '';
     seg.elemento_materiale = matEdit ? matEdit.value : '';
     seg.elemento_comizio = comizioEdit ? comizioEdit.value : '';
@@ -2788,7 +2788,13 @@ function injectReteInfo(lat, lng) {
   var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#8b949e;margin-bottom:6px">Elemento rete</div>' +
     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
     '<div style="width:10px;height:10px;background:' + col + ';border-radius:50%;flex-shrink:0"></div>' +
-    '<span style="font-weight:600;color:' + col + '">' + info.tipo + '</span>' +
+    '<select id="rete-tipo-edit" style="background:rgba(0,0,0,0.3);border:1px solid ' + col + '44;border-radius:4px;color:' + col + ';font-size:12px;font-weight:600;padding:3px 6px;outline:none;font-family:Barlow,sans-serif;cursor:pointer">' +
+    '<option value="Condotta principale"' + (info.tipo==='Condotta principale'?' selected':'') + '>Condotta principale</option>' +
+    '<option value="Condotta secondaria"' + (info.tipo==='Condotta secondaria'?' selected':'') + '>Condotta secondaria</option>' +
+    '<option value="Condotta comiziale"' + (info.tipo==='Condotta comiziale'?' selected':'') + '>Condotta comiziale</option>' +
+    '<option value="Ponte tubo"' + (info.tipo==='Ponte tubo'?' selected':'') + '>Ponte tubo</option>' +
+    '<option value="Idrante"' + (info.tipo==='Idrante'?' selected':'') + '>Idrante</option>' +
+    '</select>' +
     '</div>';
 
   if (isIdrante) {
