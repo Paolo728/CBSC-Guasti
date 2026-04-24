@@ -1384,6 +1384,8 @@ function initApp() {
   });
 
   loadSegnalazioni();
+  initReteIdrica();
+  keepSupabaseAlive();
 
   // GPS automatico all'avvio
   if (navigator.geolocation) {
@@ -2589,6 +2591,170 @@ function vaiAlMarker(id) {
     map.setView(marker.getLatLng(), 16);
     setTimeout(function() { marker.openPopup(); }, 400);
   }
+}
+
+
+// ════════════════════════════════════════
+// SUPABASE KEEPALIVE (evita pausa progetto)
+// ════════════════════════════════════════
+function keepSupabaseAlive() {
+  var KEY = 'sb_last_ping';
+  var INTERVAL = 4 * 24 * 60 * 60 * 1000; // 4 giorni in ms
+  var last = parseInt(localStorage.getItem(KEY) || '0');
+  var now = Date.now();
+  if (now - last < INTERVAL) return; // ping recente, non serve
+  // Fa una query leggera: conta solo 1 riga da idranti
+  fetch(SB_URL + '/rest/v1/idranti?select=fid&limit=1', {
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+  }).then(function(r) {
+    if (r.ok) {
+      localStorage.setItem(KEY, String(now));
+      console.log('Supabase keepalive OK');
+    }
+  }).catch(function(e) { console.warn('Keepalive failed:', e); });
+  // Ripeti ogni 4 giorni finché l'app è aperta
+  setTimeout(keepSupabaseAlive, INTERVAL);
+}
+
+// === RETE IDRICA SUPABASE ===
+const SB_URL = 'https://xdbogwolkcxffrcweekl.supabase.co';
+const SB_KEY = 'sb_publishable_UnjxyOFGqIM8pJIL1GSxgA_e2tUY2gK';
+const MIN_ZOOM_RETE = 14;
+
+const RETE_LAYERS = {
+  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', type:'line' },
+  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', type:'line' },
+  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', type:'line' },
+  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', type:'line' },
+  idranti:             { label:'Idranti',             color:'#ffffff', weight:1.5, nameField:'idrante', type:'point' }
+};
+
+var reteLayersVisible = { condotta_principale:true, condotta_secondaria:true, condotta_comiziale:true, ponti_tubo:true, idranti:true };
+var reteLayerGroups = {};
+var reteCache = {};
+var nearestReteElement = null;
+
+function initReteIdrica() {
+  Object.keys(RETE_LAYERS).forEach(function(t) { reteLayerGroups[t] = L.layerGroup().addTo(map); });
+  map.on('moveend', loadReteIdricaVisible);
+  map.on('zoomend', function() {
+    var z = map.getZoom();
+    Object.keys(RETE_LAYERS).forEach(function(t) {
+      if (!reteLayersVisible[t]) return;
+      var op = z < MIN_ZOOM_RETE ? 0 : 1;
+      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:op, fillOpacity:op>0?0.9:0}); });
+    });
+    if (z >= MIN_ZOOM_RETE) loadReteIdricaVisible();
+  });
+  buildReteToggleUI();
+  loadReteIdricaVisible();
+}
+
+async function loadReteIdricaVisible() {
+  if (map.getZoom() < MIN_ZOOM_RETE) return;
+  var b = map.getBounds();
+  for (var t in RETE_LAYERS) {
+    if (!reteLayersVisible[t]) continue;
+    await loadReteLayer(t, b.getWest(), b.getEast(), b.getSouth(), b.getNorth());
+  }
+}
+
+async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
+  var z = map.getZoom();
+  var cx = Math.floor((minLng+maxLng)/2/0.04);
+  var cy = Math.floor((minLat+maxLat)/2/0.04);
+  var ck = table+'_'+z+'_'+cx+'_'+cy;
+  if (reteCache[ck]) return;
+  reteCache[ck] = true;
+  var cfg = RETE_LAYERS[table];
+  var bbox = 'SRID=4326;POLYGON(('+minLng.toFixed(6)+' '+minLat.toFixed(6)+','+maxLng.toFixed(6)+' '+minLat.toFixed(6)+','+maxLng.toFixed(6)+' '+maxLat.toFixed(6)+','+minLng.toFixed(6)+' '+maxLat.toFixed(6)+','+minLng.toFixed(6)+' '+minLat.toFixed(6)+'))';
+  var sel = 'fid,'+cfg.nameField+(table==='idranti'?',comizio':',diametro,materiale')+',geom';
+  var url = SB_URL+'/rest/v1/'+table+'?select='+sel+'&geom=ov.'+encodeURIComponent(bbox)+'&limit=1500';
+  try {
+    var r = await fetch(url, { headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Accept':'application/geo+json'} });
+    if (!r.ok) { console.warn('SB err',table,r.status); reteCache[ck]=false; return; }
+    var gj = await r.json();
+    if (!gj.features||gj.features.length===0) return;
+    gj.features.forEach(function(f) {
+      if (!f.geometry) return;
+      var p = f.properties||{};
+      var nome = p[cfg.nameField]||('ID:'+p.fid)||'—';
+      if (cfg.type==='point') {
+        var c = f.geometry.coordinates;
+        if (!c) return;
+        var ll = [c[1],c[0]];
+        var mk = L.circleMarker(ll, {radius:5,color:'#444',weight:1.5,fillColor:'#ffffff',fillOpacity:0.95});
+        mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">💧 Idrante</b><br>ID: '+nome+(p.comizio?'<br>Comizio: '+p.comizio:'')+'</div>',{maxWidth:200});
+        mk.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:'Idrante',nome:nome,table:'idranti'};openFormAtPoint(ll[0],ll[1]);});
+        reteLayerGroups[table].addLayer(mk);
+      } else {
+        var st = {color:cfg.color,weight:cfg.weight,opacity:0.9};
+        if (cfg.dashArray) st.dashArray=cfg.dashArray;
+        var gl = L.geoJSON(f,{style:st});
+        var diam = p.diametro?' Ø'+p.diametro+'mm':'';
+        var mat = p.materiale?' · '+p.materiale:'';
+        gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:'+cfg.color+'">'+cfg.label+'</b><br>'+nome+diam+mat+'</div>',{maxWidth:220});
+        gl.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:cfg.label,nome:nome,table:table};openFormAtPoint(e.latlng.lat,e.latlng.lng);});
+        reteLayerGroups[table].addLayer(gl);
+      }
+    });
+  } catch(e) { console.warn('Rete err',table,e); reteCache[ck]=false; }
+}
+
+function buildReteToggleUI() {
+  var div = document.createElement('div');
+  div.id='rete-toggle';
+  div.style.cssText='position:absolute;bottom:calc(76px + env(safe-area-inset-bottom,0px));left:12px;background:rgba(13,17,23,0.92);border:1px solid #30363d;border-radius:12px;padding:8px 10px;z-index:500;font-family:Barlow,sans-serif;font-size:11px;min-width:155px;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
+  var dots={condotta_principale:'width:18px;height:4px;background:#00dd00;border-radius:2px',condotta_secondaria:'width:18px;height:3px;background:#f0a500;border-radius:2px',condotta_comiziale:'width:18px;height:2px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 6px,transparent 6px,transparent 10px)',ponti_tubo:'width:18px;height:3px;background:#ff00cc;border-radius:2px',idranti:'width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid #555;flex-shrink:0'};
+  var html='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;margin-bottom:7px">🗺 Rete idrica</div>';
+  Object.keys(RETE_LAYERS).forEach(function(t){
+    var cfg=RETE_LAYERS[t];
+    html+='<div id="toggle-row-'+t+'" onclick="toggleReteLayer(\''+t+'\')" style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:2px 0"><div style="'+dots[t]+';flex-shrink:0"></div><span style="color:#e6edf3">'+cfg.label+'</span></div>';
+  });
+  div.innerHTML=html;
+  L.DomEvent.disableClickPropagation(div);
+  document.getElementById('map').appendChild(div);
+}
+
+function toggleReteLayer(table) {
+  reteLayersVisible[table]=!reteLayersVisible[table];
+  var row=document.getElementById('toggle-row-'+table);
+  if (reteLayersVisible[table]) { reteLayerGroups[table].addTo(map); if(row)row.style.opacity='1'; loadReteIdricaVisible(); }
+  else { map.removeLayer(reteLayerGroups[table]); if(row)row.style.opacity='0.35'; }
+}
+
+var _origOpenForm = openFormAtPoint;
+openFormAtPoint = function(lat,lng) {
+  _origOpenForm(lat,lng);
+  setTimeout(function(){ injectReteInfo(lat,lng); },280);
+};
+
+function injectReteInfo(lat,lng) {
+  var old=document.getElementById('rete-info-box'); if(old)old.remove();
+  var info=nearestReteElement||findNearestRete(lat,lng);
+  nearestReteElement=null;
+  if (!info) return;
+  var cfg=RETE_LAYERS[info.table]||{};
+  var col=cfg.color||'#58a6ff';
+  var box=document.createElement('div');
+  box.id='rete-info-box';
+  box.style.cssText='background:rgba(13,17,23,0.6);border:1px solid '+col+'55;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#e6edf3';
+  box.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#8b949e;margin-bottom:3px">Elemento rete</div><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;background:'+col+';border-radius:50%;flex-shrink:0"></div><span style="font-weight:600;color:'+col+'">'+info.tipo+'</span><span style="color:#8b949e;margin-left:4px;font-size:11px">'+info.nome+'</span></div>';
+  var fb=document.querySelector('.form-body');
+  if(fb) fb.insertBefore(box,fb.firstChild);
+}
+
+function findNearestRete(lat,lng) {
+  var nearest=null,minD=Infinity;
+  Object.keys(reteLayerGroups).forEach(function(t){
+    reteLayerGroups[t].eachLayer(function(l){
+      var ll=l.getLatLng?l.getLatLng():(l.getBounds?l.getBounds().getCenter():null);
+      if(!ll)return;
+      var d=Math.pow(ll.lat-lat,2)+Math.pow(ll.lng-lng,2);
+      if(d<minD){minD=d;var cfg=RETE_LAYERS[t];nearest={tipo:cfg?cfg.label:t,nome:'—',table:t};}
+    });
+  });
+  return minD<0.00015?nearest:null;
 }
 
 </script>
