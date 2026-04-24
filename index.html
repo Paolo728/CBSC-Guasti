@@ -2340,7 +2340,7 @@ function stampaPDF(id) {
   var html = '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">' +
     '<title>Ordine di Lavoro ' + (seg.codice||'') + '</title>' +
     '<style>' +
-    'body{font-family:Arial,sans-serif;margin:0;padding:10px;color:#222;font-size:11px}' +
+    'body{font-family:Arial,sans-serif;margin:0;padding:14px 20px;color:#222;font-size:11px}' +
     '.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0d47a1;padding-bottom:6px;margin-bottom:8px}' +
     '.header-left h1{margin:0;font-size:15px;color:#0d47a1;font-weight:700}' +
     '.header-left p{margin:1px 0;font-size:9px;color:#666}' +
@@ -2360,7 +2360,7 @@ function stampaPDF(id) {
     '.firma-box .label{font-size:9px;color:#999;margin-bottom:14px}' +
     '.firma-line{border-top:1px solid #bbb;margin-top:6px;padding-top:3px;font-size:9px;color:#999;text-align:center}' +
     '.footer{margin-top:10px;border-top:1px solid #eee;padding-top:8px;font-size:9px;color:#999;display:flex;justify-content:space-between}' +
-    '@media print{body{padding:8px}.no-print{display:none}*{-webkit-print-color-adjust:exact}}' +
+    '@media print{@page{margin:15mm 12mm}body{padding:0}.no-print{display:none}*{-webkit-print-color-adjust:exact}}' +
     '</style></head><body>' +
 
     // Header
@@ -2388,7 +2388,6 @@ function stampaPDF(id) {
     '<tr><td>Data / Ora</td><td>' + (seg.timestamp_display||'—') + '</td></tr>' +
     (seg.preso_da ? '<tr><td>Preso in carico</td><td>' + seg.preso_da + '</td></tr>' : '') +
     (seg.chiuso_da ? '<tr><td>Chiuso da</td><td>' + seg.chiuso_da + '</td></tr>' : '') +
-    (seg.elemento_tipo ? '<tr><td>Elemento rete</td><td><strong>' + seg.elemento_tipo + '</strong> — ' + (seg.elemento_rete||'') + (seg.elemento_diametro?' Ø'+seg.elemento_diametro+'mm':'') + (seg.elemento_materiale?' '+seg.elemento_materiale:'') + (seg.elemento_comizio?' (Comizio: '+seg.elemento_comizio+')':'') + '</td></tr>' : '') +
     '</table></div>' +
 
     '<div>' +
@@ -2407,15 +2406,24 @@ function stampaPDF(id) {
 
     '</div>' +
 
-    // Operatori, Materiali, Attrezzature uno sotto l'altro
+    // Sezione elemento rete SEMPRE visibile
+    '<div class="section"><div class="section-title">Elemento rete idrica</div>' +
+    '<table>' +
+    '<tr><td style="width:130px">Tipo elemento</td><td><strong>' + (seg.elemento_tipo||'—') + '</strong></td>' +
+    '<td style="width:110px;font-weight:600;color:#555">Nome / ID</td><td>' + (seg.elemento_rete||'—') + '</td></tr>' +
+    '<tr><td>Diametro</td><td>' + (seg.elemento_diametro ? 'Ø ' + seg.elemento_diametro + ' mm' : '—') + '</td>' +
+    '<td style="font-weight:600;color:#555">Materiale</td><td>' + (seg.elemento_materiale||seg.elemento_comizio||'—') + '</td></tr>' +
+    '</table></div>' +
+
+    // Operatori, Materiali, Attrezzature
     '<div class="section"><div class="section-title">Operatori</div>' +
-    '<div class="box" style="height:60px">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
+    '<div class="box" style="height:75px">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
 
     '<div class="section"><div class="section-title">Materiali utilizzati</div>' +
-    '<div class="box" style="height:60px"></div></div>' +
+    '<div class="box" style="height:75px"></div></div>' +
 
     '<div class="section"><div class="section-title">Attrezzature e mezzi d\'opera</div>' +
-    '<div class="box" style="height:60px"></div></div>' +
+    '<div class="box" style="height:75px"></div></div>' +
 
     // Firme in fondo
     '<div class="firma-box">' +
