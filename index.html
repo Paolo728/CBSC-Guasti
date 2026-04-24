@@ -2595,49 +2595,40 @@ function vaiAlMarker(id) {
 
 
 // ════════════════════════════════════════
-// SUPABASE KEEPALIVE (evita pausa progetto)
 // ════════════════════════════════════════
-// Header helper per tutte le chiamate Supabase
+// SUPABASE KEEPALIVE
+// ════════════════════════════════════════
 function sbHeaders(type) {
-  var h = {
-    'apikey': SB_KEY,
-    'Authorization': 'Bearer ' + SB_KEY,
-    'Content-Type': 'application/json'
-  };
+  var h = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   if (type === 'geo') h['Accept'] = 'application/geo+json';
   return h;
 }
 
 function keepSupabaseAlive() {
   var KEY = 'sb_last_ping';
-  var INTERVAL = 4 * 24 * 60 * 60 * 1000; // 4 giorni in ms
+  var INTERVAL = 4 * 24 * 60 * 60 * 1000;
   var last = parseInt(localStorage.getItem(KEY) || '0');
   var now = Date.now();
-  if (now - last < INTERVAL) return; // ping recente, non serve
-  // Fa una query leggera: conta solo 1 riga da idranti
-  fetch(SB_URL + '/rest/v1/idranti?select=fid&limit=1', {
-    headers: sbHeaders()
-  }).then(function(r) {
-    if (r.ok) {
-      localStorage.setItem(KEY, String(now));
-      console.log('Supabase keepalive OK');
-    }
-  }).catch(function(e) { console.warn('Keepalive failed:', e); });
-  // Ripeti ogni 4 giorni finché l'app è aperta
+  if (now - last < INTERVAL) return;
+  fetch(SB_URL + '/rest/v1/idranti?select=fid&limit=1', { headers: sbHeaders() })
+    .then(function(r) { if (r.ok) { localStorage.setItem(KEY, String(now)); } })
+    .catch(function(e) {});
   setTimeout(keepSupabaseAlive, INTERVAL);
 }
 
-// === RETE IDRICA SUPABASE ===
+// ════════════════════════════════════════
+// RETE IDRICA DA SUPABASE
+// ════════════════════════════════════════
 const SB_URL = 'https://xdbogwolkcxffrcweekl.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYm9nd29sa2N4ZmZyY3dlZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjgzODEsImV4cCI6MjA5MjQ0NDM4MX0.nu_g8Wc6zUIE02IPwvrAV2XyeC13801NG5uVQxetVrA';
 const MIN_ZOOM_RETE = 14;
 
 const RETE_LAYERS = {
-  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', diamField:'diametro', matField:'materiale', type:'line' },
-  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', diamField:'dn', matField:'materiale', type:'line' },
-  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', diamField:'dn', matField:'materiale', type:'line' },
-  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', diamField:'diametro', matField:null, type:'line' },
-  idranti:             { label:'Idranti',             color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point', minZoom:16 }
+  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', diamField:'diametro', matField:'materiale', type:'line', minZoom:14 },
+  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', diamField:'dn', matField:'materiale', type:'line', minZoom:14 },
+  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', diamField:'dn', matField:'materiale', type:'line', minZoom:14 },
+  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', diamField:'diametro', matField:null, type:'line', minZoom:14 },
+  idranti:             { label:'Idranti', color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point', minZoom:16 }
 };
 
 var reteLayersVisible = { condotta_principale:true, condotta_secondaria:true, condotta_comiziale:true, ponti_tubo:true, idranti:true };
@@ -2648,200 +2639,128 @@ var nearestReteElement = null;
 function initReteIdrica() {
   Object.keys(RETE_LAYERS).forEach(function(t) { reteLayerGroups[t] = L.layerGroup().addTo(map); });
   map.on('moveend', loadReteIdricaVisible);
-  map.on('zoomend', function() {
-    var z = map.getZoom();
-    Object.keys(RETE_LAYERS).forEach(function(t) {
-      if (!reteLayersVisible[t]) return;
-      var op = z < MIN_ZOOM_RETE ? 0 : 1;
-      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:op, fillOpacity:op>0?0.9:0}); });
-    });
-    if (z >= MIN_ZOOM_RETE) loadReteIdricaVisible();
-  });
+  map.on('zoomend', loadReteIdricaVisible);
   buildReteToggleUI();
   loadReteIdricaVisible();
 }
 
-async function loadReteIdricaVisible() {
+function loadReteIdricaVisible() {
   var z = map.getZoom();
   if (z < MIN_ZOOM_RETE) return;
   var b = map.getBounds();
   var minLng = b.getWest(), maxLng = b.getEast();
   var minLat = b.getSouth(), maxLat = b.getNorth();
-
-  for (var t in RETE_LAYERS) {
-    if (!reteLayersVisible[t]) continue;
-    var layerMinZoom = RETE_LAYERS[t].minZoom || MIN_ZOOM_RETE;
-    if (z < layerMinZoom) {
-      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:0,fillOpacity:0}); });
-      continue;
-    } else {
-      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:1,fillOpacity:0.95}); });
-    }
-
-    // Carica TUTTE le tile che intersecano il bounding box visibile
-    var tileSize = (t === 'idranti') ? 0.04 : 0.08;
-    var txMin = Math.floor(minLng / tileSize);
-    var txMax = Math.floor(maxLng / tileSize);
-    var tyMin = Math.floor(minLat / tileSize);
-    var tyMax = Math.floor(maxLat / tileSize);
-
-    for (var tx = txMin; tx <= txMax; tx++) {
-      for (var ty = tyMin; ty <= tyMax; ty++) {
-        var tileLng0 = tx * tileSize;
-        var tileLng1 = (tx+1) * tileSize;
-        var tileLat0 = ty * tileSize;
-        var tileLat1 = (ty+1) * tileSize;
-        await loadReteLayer(t, tileLng0, tileLng1, tileLat0, tileLat1);
-      }
-    }
-  }
+  Object.keys(RETE_LAYERS).forEach(function(t) {
+    if (!reteLayersVisible[t]) return;
+    if (z < RETE_LAYERS[t].minZoom) return;
+    loadReteLayer(t, minLng, maxLng, minLat, maxLat);
+  });
 }
 
 async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   var z = map.getZoom();
-  var tileSize = (table === 'idranti') ? 0.04 : 0.08;
-  var cx = Math.round(minLng / tileSize);
-  var cy = Math.round(minLat / tileSize);
-  var ck = table+'_'+z+'_'+cx+'_'+cy;
+  var ck = table + '_' + z + '_' + minLng.toFixed(2) + '_' + minLat.toFixed(2);
   if (reteCache[ck]) return;
   reteCache[ck] = true;
   var cfg = RETE_LAYERS[table];
-  // Costruisce select con i campi reali della tabella
   var selFields = ['fid', cfg.nameField];
   if (cfg.diamField) selFields.push(cfg.diamField);
   if (cfg.matField) selFields.push(cfg.matField);
   if (table === 'idranti') selFields.push('comizio');
   selFields.push('geom');
-  var sel = selFields.join(',');
-  var url = SB_URL+'/rest/v1/'+table+'?select='+sel+'&limit=5000';
+  var url = SB_URL + '/rest/v1/' + table + '?select=' + selFields.join(',') + '&limit=5000';
   try {
     var r = await fetch(url, { headers: sbHeaders('geo') });
-    if (!r.ok) { console.warn('SB err',table,r.status, await r.text()); reteCache[ck]=false; return; }
+    if (!r.ok) { console.warn('SB err', table, r.status); reteCache[ck] = false; return; }
     var gj = await r.json();
-    if (!gj.features||gj.features.length===0) return;
-    renderReteFeatures(table, gj.features, minLng, maxLng, minLat, maxLat);
-  } catch(e) { console.warn('Rete err',table,e); reteCache[ck]=false; }
-}
-
-function renderReteFeatures(table, features, minLng, maxLng, minLat, maxLat) {
-  var cfg = RETE_LAYERS[table];
-  features.forEach(function(f) {
-    if (!f.geometry) return;
-    var p = f.properties||{};
-    var nome = p[cfg.nameField]||('ID:'+p.fid)||'—';
-    if (cfg.type==='point') {
-      var c = f.geometry.coordinates;
-      if (!c) return;
-      // Filtro bbox per punti
-      if (c[0]<minLng||c[0]>maxLng||c[1]<minLat||c[1]>maxLat) return;
-      var ll = [c[1],c[0]];
-      var mk = L.circleMarker(ll, {radius:5,color:'#444',weight:1.5,fillColor:'#ffffff',fillOpacity:0.95});
-      mk.bindPopup(
-        '<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:160px">' +
-        '<div style="font-weight:700;color:#58a6ff;margin-bottom:6px;font-size:13px">💧 Idrante</div>' +
-        '<div><b>ID:</b> ' + nome + '</div>' +
-        (p.comizio ? '<div><b>Comizio:</b> ' + p.comizio + '</div>' : '') +
-        '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #30363d;font-size:11px;color:#8b949e">Tocca la mappa per segnalare un guasto vicino</div>' +
-        '</div>', {maxWidth:220}
-      );
-      mk.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:'Idrante',nome:nome,table:'idranti'};openFormAtPoint(ll[0],ll[1]);});
-      reteLayerGroups[table].addLayer(mk);
-    } else {
-      var st = {color:cfg.color,weight:cfg.weight,opacity:0.9};
-      if (cfg.dashArray) st.dashArray=cfg.dashArray;
-      var gl = L.geoJSON(f,{style:st});
-      var diam = cfg.diamField && p[cfg.diamField] ? ' Ø'+p[cfg.diamField]+'mm' : '';
-      var mat = cfg.matField && p[cfg.matField] ? ' · '+p[cfg.matField] : '';
-      gl.bindPopup(
-        '<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:180px">' +
-        '<div style="font-weight:700;color:' + cfg.color + ';margin-bottom:6px;font-size:13px">' + cfg.label + '</div>' +
-        '<div><b>Nome:</b> ' + nome + '</div>' +
-        (diam ? '<div><b>Diametro:</b>' + diam + '</div>' : '') +
-        (mat ? '<div><b>Materiale:</b> ' + p[cfg.matField] + '</div>' : '') +
-        '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #30363d;font-size:11px;color:#8b949e">Tocca per segnalare un guasto su questa condotta</div>' +
-        '</div>', {maxWidth:240}
-      );
-      gl.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:cfg.label,nome:nome,table:table,diametro:cfg.diamField?p[cfg.diamField]:null,materiale:cfg.matField?p[cfg.matField]:null};openFormAtPoint(e.latlng.lat,e.latlng.lng);});
-      reteLayerGroups[table].addLayer(gl);
-    }
-  });
+    if (!gj.features || gj.features.length === 0) return;
+    gj.features.forEach(function(f) {
+      if (!f.geometry) return;
+      var p = f.properties || {};
+      var nome = p[cfg.nameField] || ('ID:' + p.fid) || '---';
+      if (cfg.type === 'point') {
+        var c = f.geometry.coordinates;
+        if (!c) return;
+        if (c[0] < minLng || c[0] > maxLng || c[1] < minLat || c[1] > maxLat) return;
+        var ll = [c[1], c[0]];
+        var mk = L.circleMarker(ll, { radius:5, color:'#444', weight:1.5, fillColor:'#ffffff', fillOpacity:0.95 });
+        mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">Idrante</b><br>ID: ' + nome + (p.comizio ? '<br>Comizio: ' + p.comizio : '') + '</div>', { maxWidth:220 });
+        mk.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:'Idrante', nome:nome, table:'idranti' }; openFormAtPoint(ll[0], ll[1]); });
+        reteLayerGroups[table].addLayer(mk);
+      } else {
+        var st = { color:cfg.color, weight:cfg.weight, opacity:0.9 };
+        if (cfg.dashArray) st.dashArray = cfg.dashArray;
+        var gl = L.geoJSON(f, { style:st });
+        var diam = cfg.diamField && p[cfg.diamField] ? ' diam.' + p[cfg.diamField] + 'mm' : '';
+        var mat  = cfg.matField  && p[cfg.matField]  ? ' - ' + p[cfg.matField] : '';
+        gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:180px"><b style="color:' + cfg.color + '">' + cfg.label + '</b><br>' + nome + diam + mat + '</div>', { maxWidth:240 });
+        gl.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:cfg.label, nome:nome, table:table, diametro:cfg.diamField?p[cfg.diamField]:null, materiale:cfg.matField?p[cfg.matField]:null }; openFormAtPoint(e.latlng.lat, e.latlng.lng); });
+        reteLayerGroups[table].addLayer(gl);
+      }
+    });
+  } catch(e) { console.warn('Rete err', table, e); reteCache[ck] = false; }
 }
 
 function buildReteToggleUI() {
   var div = document.createElement('div');
-  div.id='rete-toggle';
-  div.style.cssText='position:absolute;bottom:calc(76px + env(safe-area-inset-bottom,0px));left:12px;background:rgba(13,17,23,0.92);border:1px solid #30363d;border-radius:12px;padding:8px 10px;z-index:500;font-family:Barlow,sans-serif;font-size:11px;min-width:155px;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
-  var dots={condotta_principale:'width:18px;height:4px;background:#00dd00;border-radius:2px',condotta_secondaria:'width:18px;height:3px;background:#f0a500;border-radius:2px',condotta_comiziale:'width:18px;height:2px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 6px,transparent 6px,transparent 10px)',ponti_tubo:'width:18px;height:3px;background:#ff00cc;border-radius:2px',idranti:'width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid #555;flex-shrink:0'};
-  var html='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;margin-bottom:7px">🗺 Rete idrica</div>';
-  Object.keys(RETE_LAYERS).forEach(function(t){
-    var cfg=RETE_LAYERS[t];
-    html+='<div id="toggle-row-'+t+'" onclick="toggleReteLayer(\''+t+'\')" style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:2px 0"><div style="'+dots[t]+';flex-shrink:0"></div><span style="color:#e6edf3">'+cfg.label+'</span></div>';
+  div.id = 'rete-toggle';
+  div.style.cssText = 'position:absolute;bottom:calc(76px + env(safe-area-inset-bottom,0px));left:12px;background:rgba(13,17,23,0.92);border:1px solid #30363d;border-radius:12px;padding:8px 10px;z-index:500;font-family:Barlow,sans-serif;font-size:11px;min-width:155px;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
+  var dots = { condotta_principale:'width:18px;height:4px;background:#00dd00;border-radius:2px', condotta_secondaria:'width:18px;height:3px;background:#f0a500;border-radius:2px', condotta_comiziale:'width:18px;height:2px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 6px,transparent 6px,transparent 10px)', ponti_tubo:'width:18px;height:3px;background:#ff00cc;border-radius:2px', idranti:'width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid #555;flex-shrink:0' };
+  var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;margin-bottom:7px">Rete idrica</div>';
+  Object.keys(RETE_LAYERS).forEach(function(t) {
+    html += '<div id="toggle-row-' + t + '" onclick="toggleReteLayer(\'' + t + '\')" style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:2px 0"><div style="' + dots[t] + ';flex-shrink:0"></div><span style="color:#e6edf3">' + RETE_LAYERS[t].label + '</span></div>';
   });
-  div.innerHTML=html;
+  div.innerHTML = html;
   L.DomEvent.disableClickPropagation(div);
   document.getElementById('map').appendChild(div);
 }
 
 function toggleReteLayer(table) {
-  reteLayersVisible[table]=!reteLayersVisible[table];
-  var row=document.getElementById('toggle-row-'+table);
-  if (reteLayersVisible[table]) { reteLayerGroups[table].addTo(map); if(row)row.style.opacity='1'; loadReteIdricaVisible(); }
-  else { map.removeLayer(reteLayerGroups[table]); if(row)row.style.opacity='0.35'; }
+  reteLayersVisible[table] = !reteLayersVisible[table];
+  var row = document.getElementById('toggle-row-' + table);
+  if (reteLayersVisible[table]) { reteLayerGroups[table].addTo(map); if (row) row.style.opacity='1'; loadReteIdricaVisible(); }
+  else { map.removeLayer(reteLayerGroups[table]); if (row) row.style.opacity='0.35'; }
 }
 
 var _origOpenForm = openFormAtPoint;
-openFormAtPoint = function(lat,lng) {
-  _origOpenForm(lat,lng);
-  setTimeout(function(){ injectReteInfo(lat,lng); },280);
+openFormAtPoint = function(lat, lng) {
+  _origOpenForm(lat, lng);
+  setTimeout(function() { injectReteInfo(lat, lng); }, 280);
 };
 
-function injectReteInfo(lat,lng) {
-  var old=document.getElementById('rete-info-box'); if(old)old.remove();
-  var info=nearestReteElement||findNearestRete(lat,lng);
-  nearestReteElement=null;
+function injectReteInfo(lat, lng) {
+  var old = document.getElementById('rete-info-box'); if (old) old.remove();
+  var info = nearestReteElement || findNearestRete(lat, lng);
+  nearestReteElement = null;
   if (!info) return;
-  var cfg=RETE_LAYERS[info.table]||{};
-  var col=cfg.color||'#58a6ff';
-  var box=document.createElement('div');
-  box.id='rete-info-box';
-  box.style.cssText='background:rgba(13,17,23,0.6);border:1px solid '+col+'55;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#e6edf3';
-
-  var extraInfo = '';
-  if (info.diametro) extraInfo += '<div style="margin-top:3px"><b style="color:#8b949e">Ø</b> ' + info.diametro + ' mm</div>';
-  if (info.materiale) extraInfo += '<div style="margin-top:3px"><b style="color:#8b949e">Mat:</b> ' + info.materiale + '</div>';
-
-  box.innerHTML =
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#8b949e;margin-bottom:5px">Elemento rete identificato</div>' +
-    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">' +
-    '<div style="width:10px;height:10px;background:'+col+';border-radius:50%;flex-shrink:0"></div>' +
-    '<span style="font-weight:600;color:'+col+'">'+info.tipo+'</span>' +
-    '</div>' +
-    '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:6px 8px">' +
-    '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">' +
-    '<span style="color:#8b949e;font-size:10px">Nome/ID</span>' +
-    '<input id="rete-nome-edit" value="'+info.nome+'" style="flex:1;background:transparent;border:none;border-bottom:1px solid '+col+'44;color:#e6edf3;font-size:12px;padding:1px 4px;outline:none;font-family:Barlow,sans-serif">' +
-    '</div>' +
-    extraInfo +
-    '</div>' +
-    '<div style="font-size:10px;color:#8b949e;margin-top:5px">✏️ Puoi modificare il nome se non corretto</div>';
-
-  var fb=document.querySelector('.form-body');
-  if(fb) fb.insertBefore(box,fb.firstChild);
+  var cfg = RETE_LAYERS[info.table] || {};
+  var col = cfg.color || '#58a6ff';
+  var box = document.createElement('div');
+  box.id = 'rete-info-box';
+  box.style.cssText = 'background:rgba(13,17,23,0.6);border:1px solid ' + col + '55;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#e6edf3';
+  var extra = '';
+  if (info.diametro) extra += '<div><b style="color:#8b949e">Diam:</b> ' + info.diametro + ' mm</div>';
+  if (info.materiale) extra += '<div><b style="color:#8b949e">Mat:</b> ' + info.materiale + '</div>';
+  box.innerHTML = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#8b949e;margin-bottom:5px">Elemento rete</div>' +
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><div style="width:10px;height:10px;background:' + col + ';border-radius:50%"></div><span style="font-weight:600;color:' + col + '">' + info.tipo + '</span></div>' +
+    '<input id="rete-nome-edit" value="' + info.nome + '" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid ' + col + '44;border-radius:4px;color:#e6edf3;font-size:12px;padding:4px 8px;outline:none;font-family:Barlow,sans-serif;margin-bottom:4px">' +
+    extra +
+    '<div style="font-size:10px;color:#8b949e;margin-top:4px">Modifica il nome se non corretto</div>';
+  var fb = document.querySelector('.form-body');
+  if (fb) fb.insertBefore(box, fb.firstChild);
 }
 
-function findNearestRete(lat,lng) {
-  var nearest=null,minD=Infinity;
-  Object.keys(reteLayerGroups).forEach(function(t){
-    reteLayerGroups[t].eachLayer(function(l){
-      var ll=l.getLatLng?l.getLatLng():(l.getBounds?l.getBounds().getCenter():null);
-      if(!ll)return;
-      var d=Math.pow(ll.lat-lat,2)+Math.pow(ll.lng-lng,2);
-      if(d<minD){minD=d;var cfg=RETE_LAYERS[t];nearest={tipo:cfg?cfg.label:t,nome:'—',table:t};}
+function findNearestRete(lat, lng) {
+  var nearest = null, minD = Infinity;
+  Object.keys(reteLayerGroups).forEach(function(t) {
+    reteLayerGroups[t].eachLayer(function(l) {
+      var ll = l.getLatLng ? l.getLatLng() : (l.getBounds ? l.getBounds().getCenter() : null);
+      if (!ll) return;
+      var d = Math.pow(ll.lat - lat, 2) + Math.pow(ll.lng - lng, 2);
+      if (d < minD) { minD = d; nearest = { tipo:RETE_LAYERS[t]?RETE_LAYERS[t].label:t, nome:'---', table:t }; }
     });
   });
-  return minD<0.00015?nearest:null;
+  return minD < 0.00015 ? nearest : null;
 }
 
 </script>
-</body>
-</html>
