@@ -2690,7 +2690,17 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
       } else {
         var st = { color:cfg.color, weight:cfg.weight, opacity:0.9 };
         if (cfg.dashArray) st.dashArray = cfg.dashArray;
-        var gl = L.geoJSON(f, { style:st });
+        // Rimuovi coordinata Z (quota) che Leaflet non gestisce
+        var f2 = JSON.parse(JSON.stringify(f));
+        if (f2.geometry && f2.geometry.coordinates) {
+          f2.geometry.coordinates = f2.geometry.coordinates.map(function(line) {
+            if (Array.isArray(line[0])) {
+              return line.map(function(pt) { return [pt[0], pt[1]]; });
+            }
+            return [line[0], line[1]];
+          });
+        }
+        var gl = L.geoJSON(f2, { style:st });
         var diam = cfg.diamField && p[cfg.diamField] ? ' diam.' + p[cfg.diamField] + 'mm' : '';
         var mat  = cfg.matField  && p[cfg.matField]  ? ' - ' + p[cfg.matField] : '';
         gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:180px"><b style="color:' + cfg.color + '">' + cfg.label + '</b><br>' + nome + diam + mat + '</div>', { maxWidth:240 });
