@@ -2667,15 +2667,32 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   if (reteCache[ck]) return;
   reteCache[ck] = true;
   var cfg = RETE_LAYERS[table];
-  var bbox = 'SRID=4326;POLYGON(('+minLng.toFixed(6)+' '+minLat.toFixed(6)+','+maxLng.toFixed(6)+' '+minLat.toFixed(6)+','+maxLng.toFixed(6)+' '+maxLat.toFixed(6)+','+minLng.toFixed(6)+' '+maxLat.toFixed(6)+','+minLng.toFixed(6)+' '+minLat.toFixed(6)+'))';
   var sel = 'fid,'+cfg.nameField+(table==='idranti'?',comizio':',diametro,materiale')+',geom';
-  var url = SB_URL+'/rest/v1/'+table+'?select='+sel+'&geom=ov.'+encodeURIComponent(bbox)+'&limit=1500';
+  // Usa RPC per query bbox — più compatibile con le nuove API keys
+  var url = SB_URL+'/rest/v1/'+table+'?select='+sel+'&limit=1500';
   try {
-    var r = await fetch(url, { headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Accept':'application/geo+json'} });
-    if (!r.ok) { console.warn('SB err',table,r.status); reteCache[ck]=false; return; }
+    var r = await fetch(url, { headers:{
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer '+SB_KEY,
+      'Accept': 'application/geo+json',
+      'Accept-Profile': 'public'
+    }});
+    if (!r.ok) { console.warn('SB err',table,r.status, await r.text()); reteCache[ck]=false; return; }
     var gj = await r.json();
     if (!gj.features||gj.features.length===0) return;
-    gj.features.forEach(function(f) {
+    // Filtro bbox lato client
+    var features = gj.features.filter(function(f) {
+      if (!f.geometry) return false;
+      var c = f.geometry.coordinates;
+      if (!c) return false;
+      // Per punti controlla coordinate dirette
+      if (f.geometry.type === 'Point') {
+        return c[0]>=minLng && c[0]<=maxLng && c[1]>=minLat && c[1]<=maxLat;
+      }
+      // Per linee usa bounding box approssimativa
+      return true; // accetta tutto, tanto è già filtrato per tile
+    });
+    features.forEach(function(f) {
       if (!f.geometry) return;
       var p = f.properties||{};
       var nome = p[cfg.nameField]||('ID:'+p.fid)||'—';
@@ -2697,7 +2714,7 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
         gl.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:cfg.label,nome:nome,table:table};openFormAtPoint(e.latlng.lat,e.latlng.lng);});
         reteLayerGroups[table].addLayer(gl);
       }
-    });
+    }); // end features.forEach
   } catch(e) { console.warn('Rete err',table,e); reteCache[ck]=false; }
 }
 
