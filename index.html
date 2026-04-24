@@ -2678,34 +2678,34 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   selFields.push('geom');
   var url = SB_URL + '/rest/v1/' + table + '?select=' + selFields.join(',') + '&limit=5000';
   try {
-    var r = await fetch(url, { headers: sbHeaders('geo') });
+    var r = await fetch(url, { headers: sbHeaders() });
     if (!r.ok) { console.warn('SB err', table, r.status); reteCache[ck] = false; return; }
-    var gj = await r.json();
-    if (!gj.features || gj.features.length === 0) return;
-    gj.features.forEach(function(f) {
-      if (!f.geometry) return;
-      var p = f.properties || {};
-      var nome = p[cfg.nameField] || ('ID:' + p.fid) || '---';
+    var rows = await r.json();
+    if (!rows || rows.length === 0) return;
+    rows.forEach(function(row) {
+      if (!row.geom) return;
+      var geom = typeof row.geom === 'string' ? JSON.parse(row.geom) : row.geom;
+      if (!geom || !geom.coordinates) return;
+      var nome = row[cfg.nameField] || ('ID:' + row.fid) || '---';
       if (cfg.type === 'point') {
-        var c = f.geometry.coordinates;
+        var c = geom.coordinates;
         if (!c) return;
         if (c[0] < minLng || c[0] > maxLng || c[1] < minLat || c[1] > maxLat) return;
         var ll = [c[1], c[0]];
         var mk = L.circleMarker(ll, { radius:5, color:'#444', weight:1.5, fillColor:'#ffffff', fillOpacity:0.95 });
-        mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">Idrante</b><br>ID: ' + nome + (p.comizio ? '<br>Comizio: ' + p.comizio : '') + '</div>', { maxWidth:220 });
+        mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">Idrante</b><br>ID: ' + nome + (row.comizio ? '<br>Comizio: ' + row.comizio : '') + '</div>', { maxWidth:220 });
         mk.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:'Idrante', nome:nome, table:'idranti' }; openFormAtPoint(ll[0], ll[1]); });
         reteLayerGroups[table].addLayer(mk);
       } else {
         var st = { color:cfg.color, weight:cfg.weight, opacity:0.9 };
         if (cfg.dashArray) st.dashArray = cfg.dashArray;
-        // Rimuovi coordinata Z (quota) che Leaflet non gestisce
-        var f2 = JSON.parse(JSON.stringify(f));
-        f2.geometry.coordinates = stripZ(f2.geometry.coordinates);
-        var gl = L.geoJSON(f2, { style:st });
-        var diam = cfg.diamField && p[cfg.diamField] ? ' diam.' + p[cfg.diamField] + 'mm' : '';
-        var mat  = cfg.matField  && p[cfg.matField]  ? ' - ' + p[cfg.matField] : '';
+        var geom2 = { type: geom.type, coordinates: stripZ(geom.coordinates) };
+        var feature = { type:'Feature', geometry: geom2, properties: row };
+        var gl = L.geoJSON(feature, { style:st });
+        var diam = cfg.diamField && row[cfg.diamField] ? ' diam.' + row[cfg.diamField] + 'mm' : '';
+        var mat  = cfg.matField  && row[cfg.matField]  ? ' - ' + row[cfg.matField] : '';
         gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:180px"><b style="color:' + cfg.color + '">' + cfg.label + '</b><br>' + nome + diam + mat + '</div>', { maxWidth:240 });
-        gl.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:cfg.label, nome:nome, table:table, diametro:cfg.diamField?p[cfg.diamField]:null, materiale:cfg.matField?p[cfg.matField]:null }; openFormAtPoint(e.latlng.lat, e.latlng.lng); });
+        gl.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:cfg.label, nome:nome, table:table, diametro:cfg.diamField?row[cfg.diamField]:null, materiale:cfg.matField?row[cfg.matField]:null }; openFormAtPoint(e.latlng.lat, e.latlng.lng); });
         reteLayerGroups[table].addLayer(gl);
       }
     });
