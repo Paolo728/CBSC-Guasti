@@ -2624,11 +2624,11 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const MIN_ZOOM_RETE = 14;
 
 const RETE_LAYERS = {
-  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', diamField:'diametro', matField:'materiale', type:'line', minZoom:14 },
-  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', diamField:'dn', matField:'materiale', type:'line', minZoom:14 },
-  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', diamField:'dn', matField:'materiale', type:'line', minZoom:14 },
-  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', diamField:'diametro', matField:null, type:'line', minZoom:14 },
-  idranti:             { label:'Idranti', color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point', minZoom:16 }
+  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', diamField:'diametro', matField:'materiale', type:'line', minZoom:14, rpcFunc:'get_condotta_principale' },
+  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', diamField:'dn', matField:'materiale', type:'line', minZoom:14, rpcFunc:'get_condotta_secondaria' },
+  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', diamField:'dn', matField:'materiale', type:'line', minZoom:14, rpcFunc:'get_condotta_comiziale' },
+  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', diamField:'diametro', matField:null, type:'line', minZoom:14, rpcFunc:'get_ponti_tubo' },
+  idranti:             { label:'Idranti', color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point', minZoom:16, rpcFunc:'get_idranti' }
 };
 
 var reteLayersVisible = { condotta_principale:true, condotta_secondaria:true, condotta_comiziale:true, ponti_tubo:true, idranti:true };
@@ -2671,36 +2671,30 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   if (reteCache[ck]) return;
   reteCache[ck] = true;
   var cfg = RETE_LAYERS[table];
-  var selFields = ['fid', cfg.nameField];
-  if (cfg.diamField) selFields.push(cfg.diamField);
-  if (cfg.matField) selFields.push(cfg.matField);
-  if (table === 'idranti') selFields.push('comizio');
-  selFields.push('geom');
-  var url = SB_URL + '/rest/v1/' + table + '?select=' + selFields.join(',') + '&limit=5000';
+  var url = SB_URL + '/rest/v1/rpc/' + cfg.rpcFunc;
+  var body = JSON.stringify({ min_lng: minLng, max_lng: maxLng, min_lat: minLat, max_lat: maxLat });
   try {
-    var r = await fetch(url, { headers: sbHeaders() });
-    if (!r.ok) { console.warn('SB err', table, r.status); reteCache[ck] = false; return; }
+    var r = await fetch(url, { method:'POST', headers: sbHeaders(), body: body });
+    if (!r.ok) { console.warn('SB RPC err', table, r.status); reteCache[ck] = false; return; }
     var rows = await r.json();
     if (!rows || rows.length === 0) return;
     rows.forEach(function(row) {
-      if (!row.geom) return;
-      var geom = typeof row.geom === 'string' ? JSON.parse(row.geom) : row.geom;
+      if (!row.geojson) return;
+      var geom = JSON.parse(row.geojson);
       if (!geom || !geom.coordinates) return;
       var nome = row[cfg.nameField] || ('ID:' + row.fid) || '---';
       if (cfg.type === 'point') {
         var c = geom.coordinates;
         if (!c) return;
-        if (c[0] < minLng || c[0] > maxLng || c[1] < minLat || c[1] > maxLat) return;
         var ll = [c[1], c[0]];
         var mk = L.circleMarker(ll, { radius:5, color:'#444', weight:1.5, fillColor:'#ffffff', fillOpacity:0.95 });
         mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">Idrante</b><br>ID: ' + nome + (row.comizio ? '<br>Comizio: ' + row.comizio : '') + '</div>', { maxWidth:220 });
-        mk.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:'Idrante', nome:nome, table:'idranti' }; openFormAtPoint(ll[0], ll[1]); });
+        mk.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:'Idrante', nome:nome+' - '+row.comizio, table:'idranti' }; openFormAtPoint(ll[0], ll[1]); });
         reteLayerGroups[table].addLayer(mk);
       } else {
         var st = { color:cfg.color, weight:cfg.weight, opacity:0.9 };
         if (cfg.dashArray) st.dashArray = cfg.dashArray;
-        var geom2 = { type: geom.type, coordinates: stripZ(geom.coordinates) };
-        var feature = { type:'Feature', geometry: geom2, properties: row };
+        var feature = { type:'Feature', geometry: geom, properties: row };
         var gl = L.geoJSON(feature, { style:st });
         var diam = cfg.diamField && row[cfg.diamField] ? ' diam.' + row[cfg.diamField] + 'mm' : '';
         var mat  = cfg.matField  && row[cfg.matField]  ? ' - ' + row[cfg.matField] : '';
