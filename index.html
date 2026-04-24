@@ -2715,15 +2715,21 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
         var c = geom.coordinates;
         if (!c) return;
         var ll = [c[1], c[0]];
-        var mk = L.circleMarker(ll, { radius:5, color:'#444', weight:1.5, fillColor:'#ffffff', fillOpacity:0.95 });
+        var mk = L.circleMarker(ll, { radius:8, color:'#444', weight:2, fillColor:'#ffffff', fillOpacity:0.95, bubblingMouseEvents:false });
         mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">Idrante</b><br>ID: ' + nome + (row.comizio ? '<br>Comizio: ' + row.comizio : '') + '</div>', { maxWidth:220 });
-        mk.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:'Idrante', nome:nome+' - '+row.comizio, table:'idranti' }; openFormAtPoint(ll[0], ll[1]); });
+        mk._reteData = { tipo:'Idrante', nome:nome, table:'idranti', comizio:row.comizio||'' };
+        mk.on('click', function(e) {
+          L.DomEvent.stopPropagation(e);
+          L.DomEvent.preventDefault(e);
+          nearestReteElement = { tipo:'Idrante', nome:nome+' - '+(row.comizio||''), table:'idranti' };
+          openFormAtPoint(ll[0], ll[1]);
+        });
         reteLayerGroups[table].addLayer(mk);
       } else {
         var st = { color:cfg.color, weight:cfg.weight, opacity:0.9 };
         if (cfg.dashArray) st.dashArray = cfg.dashArray;
         var feature = { type:'Feature', geometry: geom, properties: row };
-        var gl = L.geoJSON(feature, { style:st });
+        var gl = L.geoJSON(feature, { style:st, bubblingMouseEvents:false });
         var diam = cfg.diamField && row[cfg.diamField] ? ' diam.' + row[cfg.diamField] + 'mm' : '';
         var mat  = cfg.matField  && row[cfg.matField]  ? ' - ' + row[cfg.matField] : '';
         gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:180px"><b style="color:' + cfg.color + '">' + cfg.label + '</b><br>' + nome + diam + mat + '</div>', { maxWidth:240 });
