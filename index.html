@@ -2665,26 +2665,43 @@ async function loadReteIdricaVisible() {
   var z = map.getZoom();
   if (z < MIN_ZOOM_RETE) return;
   var b = map.getBounds();
+  var minLng = b.getWest(), maxLng = b.getEast();
+  var minLat = b.getSouth(), maxLat = b.getNorth();
+
   for (var t in RETE_LAYERS) {
     if (!reteLayersVisible[t]) continue;
     var layerMinZoom = RETE_LAYERS[t].minZoom || MIN_ZOOM_RETE;
-    // Nascondi/mostra in base allo zoom specifico del layer
     if (z < layerMinZoom) {
-      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:0,fillOpacity:0}); else if(l.setOpacity) l.setOpacity(0); });
+      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:0,fillOpacity:0}); });
       continue;
     } else {
-      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:1,fillOpacity:0.95}); else if(l.setOpacity) l.setOpacity(1); });
+      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:1,fillOpacity:0.95}); });
     }
-    await loadReteLayer(t, b.getWest(), b.getEast(), b.getSouth(), b.getNorth());
+
+    // Carica TUTTE le tile che intersecano il bounding box visibile
+    var tileSize = (t === 'idranti') ? 0.04 : 0.08;
+    var txMin = Math.floor(minLng / tileSize);
+    var txMax = Math.floor(maxLng / tileSize);
+    var tyMin = Math.floor(minLat / tileSize);
+    var tyMax = Math.floor(maxLat / tileSize);
+
+    for (var tx = txMin; tx <= txMax; tx++) {
+      for (var ty = tyMin; ty <= tyMax; ty++) {
+        var tileLng0 = tx * tileSize;
+        var tileLng1 = (tx+1) * tileSize;
+        var tileLat0 = ty * tileSize;
+        var tileLat1 = (ty+1) * tileSize;
+        await loadReteLayer(t, tileLng0, tileLng1, tileLat0, tileLat1);
+      }
+    }
   }
 }
 
 async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   var z = map.getZoom();
-  // Tile di 0.08° per condotte, 0.04° per idranti
   var tileSize = (table === 'idranti') ? 0.04 : 0.08;
-  var cx = Math.floor((minLng+maxLng)/2/tileSize);
-  var cy = Math.floor((minLat+maxLat)/2/tileSize);
+  var cx = Math.round(minLng / tileSize);
+  var cy = Math.round(minLat / tileSize);
   var ck = table+'_'+z+'_'+cx+'_'+cy;
   if (reteCache[ck]) return;
   reteCache[ck] = true;
