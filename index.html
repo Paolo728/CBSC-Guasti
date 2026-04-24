@@ -2681,28 +2681,12 @@ async function loadReteIdricaVisible() {
 
 async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   var z = map.getZoom();
-  // Tile più grandi (0.1°) = meno richieste quando ci si sposta di poco
-  // Idranti usano tile ancora più grandi (0.05° a zoom 16+) perché sono tanti
-  var tileSize = (table === 'idranti') ? 0.05 : 0.1;
+  // Tile di 0.08° per condotte, 0.04° per idranti
+  var tileSize = (table === 'idranti') ? 0.04 : 0.08;
   var cx = Math.floor((minLng+maxLng)/2/tileSize);
   var cy = Math.floor((minLat+maxLat)/2/tileSize);
   var ck = table+'_'+z+'_'+cx+'_'+cy;
-
-  // Controlla prima cache in memoria (velocissima)
   if (reteCache[ck]) return;
-  // Poi controlla sessionStorage (persiste per tutta la sessione)
-  try {
-    if (sessionStorage.getItem('rc_'+ck)) {
-      reteCache[ck] = true;
-      // Ricarica i layer dal sessionStorage
-      var cached = JSON.parse(sessionStorage.getItem('rc_'+ck));
-      if (cached && cached.features) {
-        renderReteFeatures(table, cached.features, minLng, maxLng, minLat, maxLat);
-      }
-      return;
-    }
-  } catch(e) { /* sessionStorage non disponibile */ }
-
   reteCache[ck] = true;
   var cfg = RETE_LAYERS[table];
   // Costruisce select con i campi reali della tabella
@@ -2718,10 +2702,6 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
     if (!r.ok) { console.warn('SB err',table,r.status, await r.text()); reteCache[ck]=false; return; }
     var gj = await r.json();
     if (!gj.features||gj.features.length===0) return;
-    // Salva in sessionStorage per riuso nella stessa sessione
-    try {
-      sessionStorage.setItem('rc_'+ck, JSON.stringify({features: gj.features}));
-    } catch(e) { /* sessionStorage pieno, non critico */ }
     renderReteFeatures(table, gj.features, minLng, maxLng, minLat, maxLat);
   } catch(e) { console.warn('Rete err',table,e); reteCache[ck]=false; }
 }
