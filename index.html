@@ -2727,7 +2727,8 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
         var diam = cfg.diamField && row[cfg.diamField] ? ' diam.' + row[cfg.diamField] + 'mm' : '';
         var mat  = cfg.matField  && row[cfg.matField]  ? ' - ' + row[cfg.matField] : '';
         gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:180px"><b style="color:' + cfg.color + '">' + cfg.label + '</b><br>' + nome + diam + mat + '</div>', { maxWidth:240 });
-        gl.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = { tipo:cfg.label, nome:nome, table:table, diametro:cfg.diamField?row[cfg.diamField]:null, materiale:cfg.matField?row[cfg.matField]:null }; openFormAtPoint(e.latlng.lat, e.latlng.lng); });
+        gl._reteData = { tipo:cfg.label, nome:nome, table:table, diametro:cfg.diamField?row[cfg.diamField]:null, materiale:cfg.matField?row[cfg.matField]:null };
+        gl.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = gl._reteData; openFormAtPoint(e.latlng.lat, e.latlng.lng); });
         reteLayerGroups[table].addLayer(gl);
       }
     });
@@ -2814,12 +2815,16 @@ function injectReteInfo(lat, lng) {
 function findNearestRete(lat, lng) {
   var nearest = null, minD = Infinity;
   Object.keys(reteLayerGroups).forEach(function(t) {
-    if (t === 'idranti') return; // idranti si cliccano solo direttamente
+    if (t === 'idranti') return;
     reteLayerGroups[t].eachLayer(function(l) {
       var ll = l.getLatLng ? l.getLatLng() : (l.getBounds ? l.getBounds().getCenter() : null);
       if (!ll) return;
       var d = Math.pow(ll.lat - lat, 2) + Math.pow(ll.lng - lng, 2);
-      if (d < minD) { minD = d; nearest = { tipo:RETE_LAYERS[t]?RETE_LAYERS[t].label:t, nome:'---', table:t }; }
+      if (d < minD) {
+        minD = d;
+        // Usa i dati salvati sul layer se disponibili
+        nearest = l._reteData || { tipo:RETE_LAYERS[t]?RETE_LAYERS[t].label:t, nome:'---', table:t };
+      }
     });
   });
   return minD < 0.00015 ? nearest : null;
