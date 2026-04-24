@@ -2637,7 +2637,7 @@ const RETE_LAYERS = {
   condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', diamField:'dn', matField:'materiale', type:'line' },
   condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', diamField:'dn', matField:'materiale', type:'line' },
   ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', diamField:'diametro', matField:null, type:'line' },
-  idranti:             { label:'Idranti',             color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point' }
+  idranti:             { label:'Idranti',             color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point', minZoom:16 }
 };
 
 var reteLayersVisible = { condotta_principale:true, condotta_secondaria:true, condotta_comiziale:true, ponti_tubo:true, idranti:true };
@@ -2662,20 +2662,47 @@ function initReteIdrica() {
 }
 
 async function loadReteIdricaVisible() {
-  if (map.getZoom() < MIN_ZOOM_RETE) return;
+  var z = map.getZoom();
+  if (z < MIN_ZOOM_RETE) return;
   var b = map.getBounds();
   for (var t in RETE_LAYERS) {
     if (!reteLayersVisible[t]) continue;
+    var layerMinZoom = RETE_LAYERS[t].minZoom || MIN_ZOOM_RETE;
+    // Nascondi/mostra in base allo zoom specifico del layer
+    if (z < layerMinZoom) {
+      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:0,fillOpacity:0}); else if(l.setOpacity) l.setOpacity(0); });
+      continue;
+    } else {
+      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:1,fillOpacity:0.95}); else if(l.setOpacity) l.setOpacity(1); });
+    }
     await loadReteLayer(t, b.getWest(), b.getEast(), b.getSouth(), b.getNorth());
   }
 }
 
 async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   var z = map.getZoom();
-  var cx = Math.floor((minLng+maxLng)/2/0.04);
-  var cy = Math.floor((minLat+maxLat)/2/0.04);
+  // Tile più grandi (0.1°) = meno richieste quando ci si sposta di poco
+  // Idranti usano tile ancora più grandi (0.05° a zoom 16+) perché sono tanti
+  var tileSize = (table === 'idranti') ? 0.05 : 0.1;
+  var cx = Math.floor((minLng+maxLng)/2/tileSize);
+  var cy = Math.floor((minLat+maxLat)/2/tileSize);
   var ck = table+'_'+z+'_'+cx+'_'+cy;
+
+  // Controlla prima cache in memoria (velocissima)
   if (reteCache[ck]) return;
+  // Poi controlla sessionStorage (persiste per tutta la sessione)
+  try {
+    if (sessionStorage.getItem('rc_'+ck)) {
+      reteCache[ck] = true;
+      // Ricarica i layer dal sessionStorage
+      var cached = JSON.parse(sessionStorage.getItem('rc_'+ck));
+      if (cached && cached.features) {
+        renderReteFeatures(table, cached.features, minLng, maxLng, minLat, maxLat);
+      }
+      return;
+    }
+  } catch(e) { /* sessionStorage non disponibile */ }
+
   reteCache[ck] = true;
   var cfg = RETE_LAYERS[table];
   // Costruisce select con i campi reali della tabella
@@ -2685,48 +2712,62 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   if (table === 'idranti') selFields.push('comizio');
   selFields.push('geom');
   var sel = selFields.join(',');
-  var url = SB_URL+'/rest/v1/'+table+'?select='+sel+'&limit=1500';
+  var url = SB_URL+'/rest/v1/'+table+'?select='+sel+'&limit=5000';
   try {
     var r = await fetch(url, { headers: sbHeaders('geo') });
     if (!r.ok) { console.warn('SB err',table,r.status, await r.text()); reteCache[ck]=false; return; }
     var gj = await r.json();
     if (!gj.features||gj.features.length===0) return;
-    // Filtro bbox lato client
-    var features = gj.features.filter(function(f) {
-      if (!f.geometry) return false;
-      var c = f.geometry.coordinates;
-      if (!c) return false;
-      // Per punti controlla coordinate dirette
-      if (f.geometry.type === 'Point') {
-        return c[0]>=minLng && c[0]<=maxLng && c[1]>=minLat && c[1]<=maxLat;
-      }
-      // Per linee usa bounding box approssimativa
-      return true; // accetta tutto, tanto è già filtrato per tile
-    });
-    features.forEach(function(f) {
-      if (!f.geometry) return;
-      var p = f.properties||{};
-      var nome = p[cfg.nameField]||('ID:'+p.fid)||'—';
-      if (cfg.type==='point') {
-        var c = f.geometry.coordinates;
-        if (!c) return;
-        var ll = [c[1],c[0]];
-        var mk = L.circleMarker(ll, {radius:5,color:'#444',weight:1.5,fillColor:'#ffffff',fillOpacity:0.95});
-        mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">💧 Idrante</b><br>ID: '+nome+(p.comizio?'<br>Comizio: '+p.comizio:'')+'</div>',{maxWidth:200});
-        mk.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:'Idrante',nome:nome,table:'idranti'};openFormAtPoint(ll[0],ll[1]);});
-        reteLayerGroups[table].addLayer(mk);
-      } else {
-        var st = {color:cfg.color,weight:cfg.weight,opacity:0.9};
-        if (cfg.dashArray) st.dashArray=cfg.dashArray;
-        var gl = L.geoJSON(f,{style:st});
-        var diam = cfg.diamField && p[cfg.diamField] ? ' Ø'+p[cfg.diamField]+'mm' : '';
-        var mat = cfg.matField && p[cfg.matField] ? ' · '+p[cfg.matField] : '';
-        gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:'+cfg.color+'">'+cfg.label+'</b><br>'+nome+diam+mat+'</div>',{maxWidth:220});
-        gl.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:cfg.label,nome:nome,table:table};openFormAtPoint(e.latlng.lat,e.latlng.lng);});
-        reteLayerGroups[table].addLayer(gl);
-      }
-    }); // end features.forEach
+    // Salva in sessionStorage per riuso nella stessa sessione
+    try {
+      sessionStorage.setItem('rc_'+ck, JSON.stringify({features: gj.features}));
+    } catch(e) { /* sessionStorage pieno, non critico */ }
+    renderReteFeatures(table, gj.features, minLng, maxLng, minLat, maxLat);
   } catch(e) { console.warn('Rete err',table,e); reteCache[ck]=false; }
+}
+
+function renderReteFeatures(table, features, minLng, maxLng, minLat, maxLat) {
+  var cfg = RETE_LAYERS[table];
+  features.forEach(function(f) {
+    if (!f.geometry) return;
+    var p = f.properties||{};
+    var nome = p[cfg.nameField]||('ID:'+p.fid)||'—';
+    if (cfg.type==='point') {
+      var c = f.geometry.coordinates;
+      if (!c) return;
+      // Filtro bbox per punti
+      if (c[0]<minLng||c[0]>maxLng||c[1]<minLat||c[1]>maxLat) return;
+      var ll = [c[1],c[0]];
+      var mk = L.circleMarker(ll, {radius:5,color:'#444',weight:1.5,fillColor:'#ffffff',fillOpacity:0.95});
+      mk.bindPopup(
+        '<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:160px">' +
+        '<div style="font-weight:700;color:#58a6ff;margin-bottom:6px;font-size:13px">💧 Idrante</div>' +
+        '<div><b>ID:</b> ' + nome + '</div>' +
+        (p.comizio ? '<div><b>Comizio:</b> ' + p.comizio + '</div>' : '') +
+        '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #30363d;font-size:11px;color:#8b949e">Tocca la mappa per segnalare un guasto vicino</div>' +
+        '</div>', {maxWidth:220}
+      );
+      mk.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:'Idrante',nome:nome,table:'idranti'};openFormAtPoint(ll[0],ll[1]);});
+      reteLayerGroups[table].addLayer(mk);
+    } else {
+      var st = {color:cfg.color,weight:cfg.weight,opacity:0.9};
+      if (cfg.dashArray) st.dashArray=cfg.dashArray;
+      var gl = L.geoJSON(f,{style:st});
+      var diam = cfg.diamField && p[cfg.diamField] ? ' Ø'+p[cfg.diamField]+'mm' : '';
+      var mat = cfg.matField && p[cfg.matField] ? ' · '+p[cfg.matField] : '';
+      gl.bindPopup(
+        '<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:180px">' +
+        '<div style="font-weight:700;color:' + cfg.color + ';margin-bottom:6px;font-size:13px">' + cfg.label + '</div>' +
+        '<div><b>Nome:</b> ' + nome + '</div>' +
+        (diam ? '<div><b>Diametro:</b>' + diam + '</div>' : '') +
+        (mat ? '<div><b>Materiale:</b> ' + p[cfg.matField] + '</div>' : '') +
+        '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #30363d;font-size:11px;color:#8b949e">Tocca per segnalare un guasto su questa condotta</div>' +
+        '</div>', {maxWidth:240}
+      );
+      gl.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:cfg.label,nome:nome,table:table,diametro:cfg.diamField?p[cfg.diamField]:null,materiale:cfg.matField?p[cfg.matField]:null};openFormAtPoint(e.latlng.lat,e.latlng.lng);});
+      reteLayerGroups[table].addLayer(gl);
+    }
+  });
 }
 
 function buildReteToggleUI() {
@@ -2766,8 +2807,27 @@ function injectReteInfo(lat,lng) {
   var col=cfg.color||'#58a6ff';
   var box=document.createElement('div');
   box.id='rete-info-box';
-  box.style.cssText='background:rgba(13,17,23,0.6);border:1px solid '+col+'55;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#e6edf3';
-  box.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#8b949e;margin-bottom:3px">Elemento rete</div><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;background:'+col+';border-radius:50%;flex-shrink:0"></div><span style="font-weight:600;color:'+col+'">'+info.tipo+'</span><span style="color:#8b949e;margin-left:4px;font-size:11px">'+info.nome+'</span></div>';
+  box.style.cssText='background:rgba(13,17,23,0.6);border:1px solid '+col+'55;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#e6edf3';
+
+  var extraInfo = '';
+  if (info.diametro) extraInfo += '<div style="margin-top:3px"><b style="color:#8b949e">Ø</b> ' + info.diametro + ' mm</div>';
+  if (info.materiale) extraInfo += '<div style="margin-top:3px"><b style="color:#8b949e">Mat:</b> ' + info.materiale + '</div>';
+
+  box.innerHTML =
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#8b949e;margin-bottom:5px">Elemento rete identificato</div>' +
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">' +
+    '<div style="width:10px;height:10px;background:'+col+';border-radius:50%;flex-shrink:0"></div>' +
+    '<span style="font-weight:600;color:'+col+'">'+info.tipo+'</span>' +
+    '</div>' +
+    '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:6px 8px">' +
+    '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">' +
+    '<span style="color:#8b949e;font-size:10px">Nome/ID</span>' +
+    '<input id="rete-nome-edit" value="'+info.nome+'" style="flex:1;background:transparent;border:none;border-bottom:1px solid '+col+'44;color:#e6edf3;font-size:12px;padding:1px 4px;outline:none;font-family:Barlow,sans-serif">' +
+    '</div>' +
+    extraInfo +
+    '</div>' +
+    '<div style="font-size:10px;color:#8b949e;margin-top:5px">✏️ Puoi modificare il nome se non corretto</div>';
+
   var fb=document.querySelector('.form-body');
   if(fb) fb.insertBefore(box,fb.firstChild);
 }
