@@ -2657,6 +2657,14 @@ function loadReteIdricaVisible() {
   });
 }
 
+function stripZ(coords) {
+  if (!Array.isArray(coords)) return coords;
+  // Se è un punto [lng, lat, z]
+  if (typeof coords[0] === 'number') return [coords[0], coords[1]];
+  // Altrimenti ricorsivo su array di array
+  return coords.map(stripZ);
+}
+
 async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   var z = map.getZoom();
   var ck = table + '_' + z + '_' + minLng.toFixed(2) + '_' + minLat.toFixed(2);
@@ -2692,14 +2700,7 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
         if (cfg.dashArray) st.dashArray = cfg.dashArray;
         // Rimuovi coordinata Z (quota) che Leaflet non gestisce
         var f2 = JSON.parse(JSON.stringify(f));
-        if (f2.geometry && f2.geometry.coordinates) {
-          f2.geometry.coordinates = f2.geometry.coordinates.map(function(line) {
-            if (Array.isArray(line[0])) {
-              return line.map(function(pt) { return [pt[0], pt[1]]; });
-            }
-            return [line[0], line[1]];
-          });
-        }
+        f2.geometry.coordinates = stripZ(f2.geometry.coordinates);
         var gl = L.geoJSON(f2, { style:st });
         var diam = cfg.diamField && p[cfg.diamField] ? ' diam.' + p[cfg.diamField] + 'mm' : '';
         var mat  = cfg.matField  && p[cfg.matField]  ? ' - ' + p[cfg.matField] : '';
