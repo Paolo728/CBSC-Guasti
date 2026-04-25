@@ -878,6 +878,16 @@ textarea{resize:none;min-height:90px;}
   transition: opacity 0.2s;
 }
 .modal-btn-confirm:hover { opacity: 0.85; }
+
+@media (min-width:769px){
+  .fab-segnala { display:none !important; }
+  .gps-btn { display:none !important; }
+  .tap-hint { display:none !important; }
+}
+
+<style>
+@media (min-width:769px){ .desktop-only{ display:flex !important; } }
+</style>
 </style>
 </head>
 <body>
@@ -924,6 +934,9 @@ textarea{resize:none;min-height:90px;}
       </button>
       <button class="stats-btn" id="btn-layer" onclick="toggleRetePanel(); event.stopPropagation();">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>Layer
+      </button>
+      <button class="stats-btn desktop-only" onclick="openDownload()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download
       </button>
       <button class="stats-btn" onclick="doLogout()" style="background:rgba(230,57,70,0.1);border-color:var(--red);color:var(--red)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Esci
@@ -1776,6 +1789,9 @@ function addMarkerToMap(seg) {
   marker._segData = seg;
   marker._buildIcon = buildIcon;
   marker._color = color;
+  // Cache per download
+  if (!window._segCache) window._segCache = {};
+  window._segCache[seg.id] = seg;
 }
 
 // ── PIN CHIUSURA / PRESA IN CARICO ──
@@ -3011,4 +3027,197 @@ function selectTipo(val) {
   if (menu) menu.style.display = 'none';
 }
 
+// ════════════════════════════════════════
+// DOWNLOAD EXCEL (solo desktop)
+// ════════════════════════════════════════
+function openDownload() {
+  var modal = document.getElementById('download-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  // Popola comuni dal cache segnalazioni
+  var sel = document.getElementById('dl-comune');
+  if (sel && window._segCache) {
+    var comuni = [...new Set(Object.values(window._segCache)
+      .map(function(s) { return s.comune || ''; })
+      .filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">Tutti i comuni</option>';
+    comuni.forEach(function(c) {
+      sel.innerHTML += '<option value="' + c + '">' + c + '</option>';
+    });
+  }
+
+  // Date default: ultimi 30 giorni
+  var oggi = new Date();
+  var mese = new Date(oggi);
+  mese.setDate(mese.getDate() - 30);
+  document.getElementById('dl-al').value = oggi.toISOString().split('T')[0];
+  document.getElementById('dl-dal').value = mese.toISOString().split('T')[0];
+}
+
+function closeDownload() {
+  var modal = document.getElementById('download-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function esportaExcel() {
+  var countEl = document.getElementById('dl-count');
+  if (countEl) countEl.textContent = 'Caricamento dati...';
+
+  var dal   = document.getElementById('dl-dal').value;
+  var al    = document.getElementById('dl-al').value;
+  var zona  = document.getElementById('dl-zona').value;
+  var comune= document.getElementById('dl-comune').value;
+  var stato = document.getElementById('dl-stato').value;
+
+  // Leggi tutte le segnalazioni da Firebase
+  try {
+    var resp = await fetch(FB_BASE + '/segnalazioni', {
+      headers: { 'Authorization': 'Bearer ' + await getFirebaseToken() }
+    });
+    var data = await resp.json();
+    if (!data.documents) { if (countEl) countEl.textContent = 'Nessun dato trovato.'; return; }
+
+    var rows = data.documents.map(function(doc) {
+      var f = doc.fields;
+      var lat = f.lat?.doubleValue || f.lat?.integerValue || '';
+      var lng = f.lng?.doubleValue || f.lng?.integerValue || '';
+      return {
+        codice:       f.codice?.stringValue || '',
+        data_ora:     f.timestamp_display?.stringValue || '',
+        zona:         f.zona_label?.stringValue || '',
+        comune:       f.comune?.stringValue || '',
+        tipo:         f.tipo?.stringValue || '',
+        priorita:     f.priorita?.stringValue || '',
+        stato:        f.stato?.stringValue || '',
+        descrizione:  f.descrizione?.stringValue || '',
+        segnalato_da: f.segnalato_da?.stringValue || '',
+        preso_da:     f.preso_da?.stringValue || '',
+        chiuso_da:    f.chiuso_da?.stringValue || '',
+        chiuso_il:    f.chiuso_il?.stringValue || '',
+        elemento_tipo:     f.elemento_tipo?.stringValue || '',
+        elemento_rete:     f.elemento_rete?.stringValue || '',
+        elemento_diametro: f.elemento_diametro?.stringValue || '',
+        elemento_materiale:f.elemento_materiale?.stringValue || '',
+        lat:          lat,
+        lng:          lng,
+        maps_url:     lat ? 'https://www.google.com/maps?q=' + lat + ',' + lng : '',
+        foto_links:   f.foto_links?.stringValue || ''
+      };
+    });
+
+    // Applica filtri
+    if (dal) rows = rows.filter(function(r) { return r.data_ora >= dal; });
+    if (al)  rows = rows.filter(function(r) { return r.data_ora <= al + ' 23:59'; });
+    if (zona)  rows = rows.filter(function(r) { return r.zona.toUpperCase().includes(zona.replace('_',' ')); });
+    if (comune) rows = rows.filter(function(r) { return r.comune === comune; });
+    if (stato) rows = rows.filter(function(r) { return r.stato === stato; });
+
+    if (rows.length === 0) {
+      if (countEl) countEl.textContent = 'Nessuna segnalazione con i filtri selezionati.';
+      return;
+    }
+
+    if (countEl) countEl.textContent = rows.length + ' segnalazioni trovate. Generazione Excel...';
+
+    // Genera Excel con SheetJS
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    script.onload = function() {
+      var headers = ['Codice','Data/Ora','Zona','Comune','Tipo','Priorità','Stato',
+        'Descrizione','Segnalato da','Preso da','Chiuso da','Chiuso il',
+        'Tipo elemento','Nome condotta/idrante','Diametro','Materiale',
+        'Lat','Lng','Posizione Maps','Link Foto'];
+
+      var wsData = [headers].concat(rows.map(function(r) {
+        return [r.codice, r.data_ora, r.zona, r.comune, r.tipo, r.priorita, r.stato,
+          r.descrizione, r.segnalato_da, r.preso_da, r.chiuso_da, r.chiuso_il,
+          r.elemento_tipo, r.elemento_rete, r.elemento_diametro, r.elemento_materiale,
+          r.lat, r.lng, r.maps_url, r.foto_links];
+      }));
+
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Larghezze colonne
+      ws['!cols'] = [
+        {wch:14},{wch:18},{wch:22},{wch:14},{wch:18},{wch:10},{wch:12},
+        {wch:35},{wch:14},{wch:14},{wch:14},{wch:18},
+        {wch:18},{wch:20},{wch:10},{wch:12},{wch:12},{wch:12},{wch:40},{wch:60}
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Segnalazioni');
+      var nome = 'CBSC_Segnalazioni_' + (dal||'') + '_' + (al||'') + '.xlsx';
+      XLSX.writeFile(wb, nome);
+      if (countEl) countEl.textContent = '✅ ' + rows.length + ' segnalazioni esportate!';
+    };
+    document.head.appendChild(script);
+
+  } catch(e) {
+    console.error('Export error:', e);
+    if (countEl) countEl.textContent = 'Errore: ' + e.message;
+  }
+}
+
+async function getFirebaseToken() {
+  // Usa il token dell'utente corrente se disponibile
+  if (window.auth && window.auth.currentUser) {
+    return await window.auth.currentUser.getIdToken();
+  }
+  return '';
+}
+
 </script>
+
+<!-- DOWNLOAD MODAL (desktop only) -->
+<div id="download-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;padding:28px;width:460px;max-width:90vw;font-family:Barlow,sans-serif">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="margin:0;font-size:18px;color:#e6edf3">📥 Download segnalazioni</h2>
+      <button onclick="closeDownload()" style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Dal</label>
+        <input type="date" id="dl-dal" style="width:100%;box-sizing:border-box;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Al</label>
+        <input type="date" id="dl-al" style="width:100%;box-sizing:border-box;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Zona</label>
+      <select id="dl-zona" style="width:100%;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+        <option value="">Tutte le zone</option>
+        <option value="MVT">Media Valle del Tirso</option>
+        <option value="CEDRINO">Cedrino</option>
+        <option value="POSADA_NORD">Posada Nord</option>
+        <option value="POSADA_SUD">Posada Sud</option>
+      </select>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Comune</label>
+      <select id="dl-comune" style="width:100%;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+        <option value="">Tutti i comuni</option>
+      </select>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Stato</label>
+      <select id="dl-stato" style="width:100%;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+        <option value="">Tutti</option>
+        <option value="APERTO">Aperto</option>
+        <option value="IN_CARICO">In carico</option>
+        <option value="RISOLTO">Risolto</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeDownload()" style="flex:1;padding:10px;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#8b949e;font-family:Barlow,sans-serif;font-size:13px;font-weight:600;cursor:pointer">Annulla</button>
+      <button onclick="esportaExcel()" style="flex:2;padding:10px;background:#58a6ff;border:none;border-radius:8px;color:white;font-family:Barlow,sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Scarica Excel
+      </button>
+    </div>
+    <div id="dl-count" style="text-align:center;margin-top:10px;font-size:12px;color:#8b949e"></div>
+  </div>
+</div>
