@@ -3071,13 +3071,14 @@ async function esportaExcel() {
   var comune= document.getElementById('dl-comune').value;
   var stato = document.getElementById('dl-stato').value;
 
-  // Leggi tutte le segnalazioni da Firebase
+  // Leggi tutte le segnalazioni da Firebase (stesso metodo di loadSegnalazioni)
   try {
-    var resp = await fetch(FB_BASE + '/segnalazioni', {
-      headers: { 'Authorization': 'Bearer ' + await getFirebaseToken() }
-    });
+    var resp = await fetch(FB_BASE + '/segnalazioni?pageSize=1000');
     var data = await resp.json();
-    if (!data.documents) { if (countEl) countEl.textContent = 'Nessun dato trovato.'; return; }
+    if (!data.documents || data.documents.length === 0) {
+      if (countEl) countEl.textContent = 'Nessuna segnalazione trovata nel database.';
+      return;
+    }
 
     var rows = data.documents.map(function(doc) {
       var f = doc.fields;
