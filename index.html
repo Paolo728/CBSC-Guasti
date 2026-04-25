@@ -3084,10 +3084,12 @@ async function esportaExcel() {
       var f = doc.fields;
       var lat = f.lat?.doubleValue || f.lat?.integerValue || '';
       var lng = f.lng?.doubleValue || f.lng?.integerValue || '';
+      var ts = f.timestamp?.stringValue || ''; // ISO format: 2026-04-23T08:01:01
       return {
         codice:       f.codice?.stringValue || '',
         data_ora:     f.timestamp_display?.stringValue || '',
-        zona:         f.zona_label?.stringValue || '',
+        timestamp:    ts,
+        zona:         f.zona_label?.stringValue || f.zona?.stringValue || '',
         comune:       f.comune?.stringValue || '',
         tipo:         f.tipo?.stringValue || '',
         priorita:     f.priorita?.stringValue || '',
@@ -3108,10 +3110,10 @@ async function esportaExcel() {
       };
     });
 
-    // Applica filtri
-    if (dal) rows = rows.filter(function(r) { return r.data_ora >= dal; });
-    if (al)  rows = rows.filter(function(r) { return r.data_ora <= al + ' 23:59'; });
-    if (zona)  rows = rows.filter(function(r) { return r.zona.toUpperCase().includes(zona.replace('_',' ')); });
+    // Applica filtri usando timestamp ISO
+    if (dal) rows = rows.filter(function(r) { return r.timestamp >= dal; });
+    if (al)  rows = rows.filter(function(r) { return r.timestamp <= al + 'T23:59:59'; });
+    if (zona)  rows = rows.filter(function(r) { return r.zona.toUpperCase().includes(zona.replace(/_/g,' ')); });
     if (comune) rows = rows.filter(function(r) { return r.comune === comune; });
     if (stato) rows = rows.filter(function(r) { return r.stato === stato; });
 
