@@ -508,6 +508,7 @@ textarea{resize:none;min-height:90px;}
 /* Leaflet overrides */
 .leaflet-control-zoom{border:1px solid var(--border)!important;border-radius:8px!important;overflow:hidden;}
 .leaflet-control-zoom a{background:var(--dark2)!important;color:var(--text)!important;border-color:var(--border)!important;}
+@media (max-width:768px){.leaflet-control-zoom{display:none!important;}}
 .leaflet-popup-content-wrapper{background:var(--dark2)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 4px 20px rgba(0,0,0,0.4)!important;color:var(--text)!important;}
 .leaflet-popup-tip{background:var(--dark2)!important;}
 
@@ -895,6 +896,11 @@ textarea{resize:none;min-height:90px;}
         <line x1="6" y1="20" x2="6" y2="14"/>
       </svg>Stats
     </button>
+    <button class="stats-btn" id="btn-layer" onclick="toggleRetePanel(); event.stopPropagation();" style="margin-left:6px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+      </svg>Layer
+    </button>
     <button class="stats-btn" onclick="doLogout()" style="margin-left:6px;background:rgba(230,57,70,0.1);border-color:var(--red);color:var(--red)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -909,12 +915,7 @@ textarea{resize:none;min-height:90px;}
       <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
       Premi il bottone rosso oppure tocca la mappa
     </div>
-    <div class="map-legend" id="map-legend">
-      <div class="legend-title">Interventi</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#e63946"></div>Aperto</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#58a6ff"></div>In carico</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#3fb950"></div>Risolto</div>
-    </div>
+    
     <div class="segnalazioni-btn" id="seg-btn" onclick="openInterventi()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       Interventi <span class="seg-count" id="seg-count">0</span>
@@ -1503,6 +1504,21 @@ function inviaForm() {
     ttl: Date.now() + (7 * 24 * 60 * 60 * 1000)
   };
 
+  // Aggiungi dati elemento rete se presenti
+  var reteBox = document.getElementById('rete-info-box');
+  if (reteBox) {
+    var nomeEdit = document.getElementById('rete-nome-edit');
+    var diamEdit = document.getElementById('rete-diam-edit');
+    var matEdit  = document.getElementById('rete-mat-edit');
+    var comizioEdit = document.getElementById('rete-comizio-edit');
+    var tipoEdit = document.getElementById('rete-tipo-edit');
+    seg.elemento_rete = nomeEdit ? nomeEdit.value : '';
+    seg.elemento_tipo = tipoEdit ? tipoEdit.value : '';
+    seg.elemento_diametro = diamEdit ? diamEdit.value : '';
+    seg.elemento_materiale = matEdit ? matEdit.value : '';
+    seg.elemento_comizio = comizioEdit ? comizioEdit.value : '';
+  }
+
   document.getElementById('sending-overlay').classList.add('show');
   document.getElementById('sending-text').textContent = 'Salvataggio e invio notifiche...';
   document.getElementById('btn-send').classList.add('loading');
@@ -1570,7 +1586,12 @@ async function saveToFirebase(seg) {
     timestamp:         { stringValue: seg.timestamp },
     timestamp_display: { stringValue: seg.timestamp_display },
     stato:             { stringValue: seg.stato },
-    ttl:               { integerValue: String(seg.ttl) }
+    ttl:               { integerValue: String(seg.ttl) },
+    elemento_rete:     { stringValue: seg.elemento_rete || '' },
+    elemento_tipo:     { stringValue: seg.elemento_tipo || '' },
+    elemento_diametro: { stringValue: seg.elemento_diametro || '' },
+    elemento_materiale:{ stringValue: seg.elemento_materiale || '' },
+    elemento_comizio:  { stringValue: seg.elemento_comizio || '' }
   }};
   var resp = await fetch(FB_BASE + '/segnalazioni', {
     method: 'POST',
@@ -1896,11 +1917,19 @@ async function sendTelegram(seg) {
   var prioEmoji = seg.priorita === 'ALTA' ? '🔴' : seg.priorita === 'MEDIA' ? '🟡' : '🟢';
   var mapsUrl   = 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng;
   var tipoUpper = (seg.tipo || 'NUOVO GUASTO').toUpperCase();
+  var reteInfo = '';
+  if (seg.elemento_tipo) {
+    reteInfo = '💧 *Elemento:* ' + seg.elemento_tipo + ' — ' + (seg.elemento_rete||'') +
+      (seg.elemento_diametro ? ' Ø'+seg.elemento_diametro+'mm' : '') +
+      (seg.elemento_materiale ? ' '+seg.elemento_materiale : '') +
+      (seg.elemento_comizio ? ' ('+seg.elemento_comizio+')' : '') + '\n';
+  }
   var text = '🚨 *' + tipoUpper + '*\n\n' +
     '📋 *Codice:* `' + (seg.codice||'N/D') + '`\n' +
     prioEmoji + ' *Priorità:* ' + seg.priorita + '\n' +
     '🔧 *Tipo:* ' + seg.tipo + '\n' +
     '📍 *Zona:* ' + seg.zona_label + '\n' +
+    reteInfo +
     '📝 *Descrizione:* ' + seg.descrizione + '\n' +
     '👤 *Segnalato da:* ' + seg.segnalato_da + '\n' +
     '🕐 *Data/ora:* ' + seg.timestamp_display + '\n\n' +
@@ -2312,27 +2341,27 @@ function stampaPDF(id) {
   var html = '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">' +
     '<title>Ordine di Lavoro ' + (seg.codice||'') + '</title>' +
     '<style>' +
-    'body{font-family:Arial,sans-serif;margin:0;padding:16px;color:#222;font-size:12px}' +
-    '.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0d47a1;padding-bottom:10px;margin-bottom:14px}' +
-    '.header-left h1{margin:0;font-size:18px;color:#0d47a1;font-weight:700}' +
-    '.header-left p{margin:2px 0;font-size:10px;color:#666}' +
-    '.codice-box{background:#0d47a1;color:white;padding:8px 16px;border-radius:8px;text-align:center}' +
-    '.codice-box .label{font-size:9px;letter-spacing:1px;opacity:0.8}' +
-    '.codice-box .value{font-size:18px;font-weight:700;letter-spacing:2px}' +
-    '.section{margin-bottom:10px}' +
-    '.section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:1px solid #eee;padding-bottom:3px;margin-bottom:6px}' +
+    'body{font-family:Arial,sans-serif;margin:0;padding:14px 20px;color:#222;font-size:11px}' +
+    '.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0d47a1;padding-bottom:6px;margin-bottom:8px}' +
+    '.header-left h1{margin:0;font-size:15px;color:#0d47a1;font-weight:700}' +
+    '.header-left p{margin:1px 0;font-size:9px;color:#666}' +
+    '.codice-box{background:#0d47a1;color:white;padding:5px 12px;border-radius:8px;text-align:center}' +
+    '.codice-box .label{font-size:8px;letter-spacing:1px;opacity:0.8}' +
+    '.codice-box .value{font-size:15px;font-weight:700;letter-spacing:2px}' +
+    '.section{margin-bottom:6px}' +
+    '.section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;border-bottom:2px solid #ccc;padding-bottom:3px;margin-bottom:6px}' +
     '.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}' +
     '.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}' +
     'table{width:100%;border-collapse:collapse}' +
-    'td{padding:4px 8px;border-bottom:1px solid #f0f0f0;vertical-align:top}' +
-    'td:first-child{font-weight:600;color:#555;width:120px;font-size:11px}' +
-    '.badge{display:inline-block;padding:2px 8px;border-radius:4px;color:white;font-weight:700;font-size:11px}' +
-    '.box{border:1px solid #eee;border-radius:4px;min-height:45px;padding:6px;color:#ccc;font-size:10px}' +
-    '.firma-box{border:1px solid #ddd;border-radius:6px;padding:10px;margin-top:10px}' +
-    '.firma-box .label{font-size:9px;color:#999;margin-bottom:20px}' +
+    'td{padding:2px 6px;border-bottom:1px solid #f0f0f0;vertical-align:top}' +
+    'td:first-child{font-weight:600;color:#555;width:110px;font-size:10px}' +
+    '.badge{display:inline-block;padding:1px 6px;border-radius:4px;color:white;font-weight:700;font-size:10px}' +
+    '.box{border:2px solid #999;border-radius:4px;min-height:30px;padding:4px;color:#ccc;font-size:10px}' +
+    '.firma-box{border:2px solid #999;border-radius:6px;padding:6px;margin-top:6px}' +
+    '.firma-box .label{font-size:9px;color:#999;margin-bottom:14px}' +
     '.firma-line{border-top:1px solid #bbb;margin-top:6px;padding-top:3px;font-size:9px;color:#999;text-align:center}' +
     '.footer{margin-top:10px;border-top:1px solid #eee;padding-top:8px;font-size:9px;color:#999;display:flex;justify-content:space-between}' +
-    '@media print{body{padding:8px}.no-print{display:none}*{-webkit-print-color-adjust:exact}}' +
+    '@media print{@page{margin:15mm 12mm}body{padding:0}.no-print{display:none}*{-webkit-print-color-adjust:exact}}' +
     '</style></head><body>' +
 
     // Header
@@ -2378,15 +2407,24 @@ function stampaPDF(id) {
 
     '</div>' +
 
-    // Operatori, Materiali, Attrezzature uno sotto l'altro
+    // Sezione elemento rete SEMPRE visibile
+    '<div class="section"><div class="section-title">Elemento rete idrica</div>' +
+    '<table>' +
+    '<tr><td style="width:130px">Tipo elemento</td><td><strong>' + (seg.elemento_tipo||'—') + '</strong></td>' +
+    '<td style="width:110px;font-weight:600;color:#555">Nome / ID</td><td>' + (seg.elemento_rete||'—') + '</td></tr>' +
+    '<tr><td>Diametro</td><td>' + (seg.elemento_diametro ? 'Ø ' + seg.elemento_diametro + ' mm' : '—') + '</td>' +
+    '<td style="font-weight:600;color:#555">Materiale</td><td>' + (seg.elemento_materiale||seg.elemento_comizio||'—') + '</td></tr>' +
+    '</table></div>' +
+
+    // Operatori, Materiali, Attrezzature
     '<div class="section"><div class="section-title">Operatori</div>' +
-    '<div class="box" style="height:100px">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
+    '<div class="box" style="height:75px">' + (seg.preso_da ? '<div style="color:#222">👤 ' + seg.preso_da + '</div>' : '') + '</div></div>' +
 
     '<div class="section"><div class="section-title">Materiali utilizzati</div>' +
-    '<div class="box" style="height:100px"></div></div>' +
+    '<div class="box" style="height:75px"></div></div>' +
 
     '<div class="section"><div class="section-title">Attrezzature e mezzi d\'opera</div>' +
-    '<div class="box" style="height:100px"></div></div>' +
+    '<div class="box" style="height:75px"></div></div>' +
 
     // Firme in fondo
     '<div class="firma-box">' +
@@ -2595,49 +2633,40 @@ function vaiAlMarker(id) {
 
 
 // ════════════════════════════════════════
-// SUPABASE KEEPALIVE (evita pausa progetto)
 // ════════════════════════════════════════
-// Header helper per tutte le chiamate Supabase
+// SUPABASE KEEPALIVE
+// ════════════════════════════════════════
 function sbHeaders(type) {
-  var h = {
-    'apikey': SB_KEY,
-    'Authorization': 'Bearer ' + SB_KEY,
-    'Content-Type': 'application/json'
-  };
+  var h = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   if (type === 'geo') h['Accept'] = 'application/geo+json';
   return h;
 }
 
 function keepSupabaseAlive() {
   var KEY = 'sb_last_ping';
-  var INTERVAL = 4 * 24 * 60 * 60 * 1000; // 4 giorni in ms
+  var INTERVAL = 4 * 24 * 60 * 60 * 1000;
   var last = parseInt(localStorage.getItem(KEY) || '0');
   var now = Date.now();
-  if (now - last < INTERVAL) return; // ping recente, non serve
-  // Fa una query leggera: conta solo 1 riga da idranti
-  fetch(SB_URL + '/rest/v1/idranti?select=fid&limit=1', {
-    headers: sbHeaders()
-  }).then(function(r) {
-    if (r.ok) {
-      localStorage.setItem(KEY, String(now));
-      console.log('Supabase keepalive OK');
-    }
-  }).catch(function(e) { console.warn('Keepalive failed:', e); });
-  // Ripeti ogni 4 giorni finché l'app è aperta
+  if (now - last < INTERVAL) return;
+  fetch(SB_URL + '/rest/v1/idranti?select=fid&limit=1', { headers: sbHeaders() })
+    .then(function(r) { if (r.ok) { localStorage.setItem(KEY, String(now)); } })
+    .catch(function(e) {});
   setTimeout(keepSupabaseAlive, INTERVAL);
 }
 
-// === RETE IDRICA SUPABASE ===
+// ════════════════════════════════════════
+// RETE IDRICA DA SUPABASE
+// ════════════════════════════════════════
 const SB_URL = 'https://xdbogwolkcxffrcweekl.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYm9nd29sa2N4ZmZyY3dlZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjgzODEsImV4cCI6MjA5MjQ0NDM4MX0.nu_g8Wc6zUIE02IPwvrAV2XyeC13801NG5uVQxetVrA';
 const MIN_ZOOM_RETE = 14;
 
 const RETE_LAYERS = {
-  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', diamField:'diametro', matField:'materiale', type:'line' },
-  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', diamField:'dn', matField:'materiale', type:'line' },
-  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', diamField:'dn', matField:'materiale', type:'line' },
-  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', diamField:'diametro', matField:null, type:'line' },
-  idranti:             { label:'Idranti',             color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point' }
+  condotta_principale: { label:'Condotta principale', color:'#00dd00', weight:4, dashArray:null, nameField:'nome', diamField:'diametro', matField:'materiale', type:'line', minZoom:14, rpcFunc:'get_condotta_principale' },
+  condotta_secondaria: { label:'Condotta secondaria', color:'#f0a500', weight:2.5, dashArray:null, nameField:'condotta', diamField:'dn', matField:'materiale', type:'line', minZoom:14, rpcFunc:'get_condotta_secondaria' },
+  condotta_comiziale:  { label:'Condotta comiziale',  color:'#cc0000', weight:1.5, dashArray:'8 4', nameField:'condotta', diamField:'dn', matField:'materiale', type:'line', minZoom:14, rpcFunc:'get_condotta_comiziale' },
+  ponti_tubo:          { label:'Ponte tubo',          color:'#ff00cc', weight:2.5, dashArray:null, nameField:'nome', diamField:'diametro', matField:null, type:'line', minZoom:14, rpcFunc:'get_ponti_tubo' },
+  idranti:             { label:'Idranti', color:'#ffffff', weight:1.5, nameField:'idrante', diamField:null, matField:null, type:'point', minZoom:16, rpcFunc:'get_idranti' }
 };
 
 var reteLayersVisible = { condotta_principale:true, condotta_secondaria:true, condotta_comiziale:true, ponti_tubo:true, idranti:true };
@@ -2652,139 +2681,241 @@ function initReteIdrica() {
     var z = map.getZoom();
     Object.keys(RETE_LAYERS).forEach(function(t) {
       if (!reteLayersVisible[t]) return;
-      var op = z < MIN_ZOOM_RETE ? 0 : 1;
-      reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:op, fillOpacity:op>0?0.9:0}); });
+      var minZ = RETE_LAYERS[t].minZoom || MIN_ZOOM_RETE;
+      if (z < minZ) {
+        reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:0,fillOpacity:0}); });
+      } else {
+        reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:1,fillOpacity:0.95}); });
+      }
     });
-    if (z >= MIN_ZOOM_RETE) loadReteIdricaVisible();
+    loadReteIdricaVisible();
   });
   buildReteToggleUI();
   loadReteIdricaVisible();
 }
 
-async function loadReteIdricaVisible() {
-  if (map.getZoom() < MIN_ZOOM_RETE) return;
+function loadReteIdricaVisible() {
+  var z = map.getZoom();
+  if (z < MIN_ZOOM_RETE) return;
   var b = map.getBounds();
-  for (var t in RETE_LAYERS) {
-    if (!reteLayersVisible[t]) continue;
-    await loadReteLayer(t, b.getWest(), b.getEast(), b.getSouth(), b.getNorth());
-  }
+  var minLng = b.getWest(), maxLng = b.getEast();
+  var minLat = b.getSouth(), maxLat = b.getNorth();
+  Object.keys(RETE_LAYERS).forEach(function(t) {
+    if (!reteLayersVisible[t]) return;
+    if (z < RETE_LAYERS[t].minZoom) return;
+    loadReteLayer(t, minLng, maxLng, minLat, maxLat);
+  });
+}
+
+function stripZ(coords) {
+  if (!Array.isArray(coords)) return coords;
+  // Se è un punto [lng, lat, z]
+  if (typeof coords[0] === 'number') return [coords[0], coords[1]];
+  // Altrimenti ricorsivo su array di array
+  return coords.map(stripZ);
 }
 
 async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
   var z = map.getZoom();
-  var cx = Math.floor((minLng+maxLng)/2/0.04);
-  var cy = Math.floor((minLat+maxLat)/2/0.04);
-  var ck = table+'_'+z+'_'+cx+'_'+cy;
+  var ck = table + '_' + z + '_' + minLng.toFixed(2) + '_' + minLat.toFixed(2);
   if (reteCache[ck]) return;
   reteCache[ck] = true;
   var cfg = RETE_LAYERS[table];
-  // Costruisce select con i campi reali della tabella
-  var selFields = ['fid', cfg.nameField];
-  if (cfg.diamField) selFields.push(cfg.diamField);
-  if (cfg.matField) selFields.push(cfg.matField);
-  if (table === 'idranti') selFields.push('comizio');
-  selFields.push('geom');
-  var sel = selFields.join(',');
-  var url = SB_URL+'/rest/v1/'+table+'?select='+sel+'&limit=1500';
+  var url = SB_URL + '/rest/v1/rpc/' + cfg.rpcFunc;
+  var body = JSON.stringify({ min_lng: minLng, max_lng: maxLng, min_lat: minLat, max_lat: maxLat });
   try {
-    var r = await fetch(url, { headers: sbHeaders('geo') });
-    if (!r.ok) { console.warn('SB err',table,r.status, await r.text()); reteCache[ck]=false; return; }
-    var gj = await r.json();
-    if (!gj.features||gj.features.length===0) return;
-    // Filtro bbox lato client
-    var features = gj.features.filter(function(f) {
-      if (!f.geometry) return false;
-      var c = f.geometry.coordinates;
-      if (!c) return false;
-      // Per punti controlla coordinate dirette
-      if (f.geometry.type === 'Point') {
-        return c[0]>=minLng && c[0]<=maxLng && c[1]>=minLat && c[1]<=maxLat;
-      }
-      // Per linee usa bounding box approssimativa
-      return true; // accetta tutto, tanto è già filtrato per tile
-    });
-    features.forEach(function(f) {
-      if (!f.geometry) return;
-      var p = f.properties||{};
-      var nome = p[cfg.nameField]||('ID:'+p.fid)||'—';
-      if (cfg.type==='point') {
-        var c = f.geometry.coordinates;
+    var r = await fetch(url, { method:'POST', headers: sbHeaders(), body: body });
+    if (!r.ok) { console.warn('SB RPC err', table, r.status); reteCache[ck] = false; return; }
+    var rows = await r.json();
+    if (!rows || rows.length === 0) return;
+    rows.forEach(function(row) {
+      if (!row.geojson) return;
+      var geom = JSON.parse(row.geojson);
+      if (!geom || !geom.coordinates) return;
+      var nome = row[cfg.nameField] || ('ID:' + row.fid) || '---';
+      if (cfg.type === 'point') {
+        var c = geom.coordinates;
         if (!c) return;
-        var ll = [c[1],c[0]];
-        var mk = L.circleMarker(ll, {radius:5,color:'#444',weight:1.5,fillColor:'#ffffff',fillOpacity:0.95});
-        mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">💧 Idrante</b><br>ID: '+nome+(p.comizio?'<br>Comizio: '+p.comizio:'')+'</div>',{maxWidth:200});
-        mk.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:'Idrante',nome:nome,table:'idranti'};openFormAtPoint(ll[0],ll[1]);});
+        var ll = [c[1], c[0]];
+        // Cerchio visibile
+        var mk = L.circleMarker(ll, { radius:8, color:'#444', weight:2, fillColor:'#ffffff', fillOpacity:0.95, bubblingMouseEvents:false });
+        // Cerchio invisibile grande per touch area mobile
+        var mkTouch = L.circleMarker(ll, { radius:20, color:'transparent', weight:0, fillColor:'transparent', fillOpacity:0, bubblingMouseEvents:false });
+        mk.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:#58a6ff">Idrante</b><br>ID: ' + nome + (row.comizio ? '<br>Comizio: ' + row.comizio : '') + '</div>', { maxWidth:220 });
+        mk._reteData = { tipo:'Idrante', nome:nome, table:'idranti', comizio:row.comizio||'' };
+        var clickHandler = function(e) {
+          L.DomEvent.stopPropagation(e);
+          L.DomEvent.preventDefault(e);
+          nearestReteElement = { tipo:'Idrante', nome:nome+' - '+(row.comizio||''), table:'idranti' };
+          openFormAtPoint(ll[0], ll[1]);
+        };
+        mk.on('click', clickHandler);
+        mkTouch.on('click', clickHandler);
         reteLayerGroups[table].addLayer(mk);
+        reteLayerGroups[table].addLayer(mkTouch);
       } else {
-        var st = {color:cfg.color,weight:cfg.weight,opacity:0.9};
-        if (cfg.dashArray) st.dashArray=cfg.dashArray;
-        var gl = L.geoJSON(f,{style:st});
-        var diam = cfg.diamField && p[cfg.diamField] ? ' Ø'+p[cfg.diamField]+'mm' : '';
-        var mat = cfg.matField && p[cfg.matField] ? ' · '+p[cfg.matField] : '';
-        gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px"><b style="color:'+cfg.color+'">'+cfg.label+'</b><br>'+nome+diam+mat+'</div>',{maxWidth:220});
-        gl.on('click',function(e){L.DomEvent.stopPropagation(e);nearestReteElement={tipo:cfg.label,nome:nome,table:table};openFormAtPoint(e.latlng.lat,e.latlng.lng);});
+        var st = { color:cfg.color, weight:cfg.weight, opacity:0.9 };
+        if (cfg.dashArray) st.dashArray = cfg.dashArray;
+        var feature = { type:'Feature', geometry: geom, properties: row };
+        var gl = L.geoJSON(feature, { style:st, bubblingMouseEvents:false });
+        var diam = cfg.diamField && row[cfg.diamField] ? ' diam.' + row[cfg.diamField] + 'mm' : '';
+        var mat  = cfg.matField  && row[cfg.matField]  ? ' - ' + row[cfg.matField] : '';
+        gl.bindPopup('<div style="font-family:Barlow,sans-serif;font-size:12px;min-width:180px"><b style="color:' + cfg.color + '">' + cfg.label + '</b><br>' + nome + diam + mat + '</div>', { maxWidth:240 });
+        gl._reteData = { tipo:cfg.label, nome:nome, table:table, diametro:cfg.diamField?row[cfg.diamField]:null, materiale:cfg.matField?row[cfg.matField]:null };
+        gl.on('click', function(e) { L.DomEvent.stopPropagation(e); nearestReteElement = gl._reteData; openFormAtPoint(e.latlng.lat, e.latlng.lng); });
         reteLayerGroups[table].addLayer(gl);
       }
-    }); // end features.forEach
-  } catch(e) { console.warn('Rete err',table,e); reteCache[ck]=false; }
+    });
+  } catch(e) { console.warn('Rete err', table, e); reteCache[ck] = false; }
 }
 
 function buildReteToggleUI() {
-  var div = document.createElement('div');
-  div.id='rete-toggle';
-  div.style.cssText='position:absolute;bottom:calc(76px + env(safe-area-inset-bottom,0px));left:12px;background:rgba(13,17,23,0.92);border:1px solid #30363d;border-radius:12px;padding:8px 10px;z-index:500;font-family:Barlow,sans-serif;font-size:11px;min-width:155px;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
-  var dots={condotta_principale:'width:18px;height:4px;background:#00dd00;border-radius:2px',condotta_secondaria:'width:18px;height:3px;background:#f0a500;border-radius:2px',condotta_comiziale:'width:18px;height:2px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 6px,transparent 6px,transparent 10px)',ponti_tubo:'width:18px;height:3px;background:#ff00cc;border-radius:2px',idranti:'width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid #555;flex-shrink:0'};
-  var html='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;margin-bottom:7px">🗺 Rete idrica</div>';
-  Object.keys(RETE_LAYERS).forEach(function(t){
-    var cfg=RETE_LAYERS[t];
-    html+='<div id="toggle-row-'+t+'" onclick="toggleReteLayer(\''+t+'\')" style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:2px 0"><div style="'+dots[t]+';flex-shrink:0"></div><span style="color:#e6edf3">'+cfg.label+'</span></div>';
+  var panel = document.createElement('div');
+  panel.id = 'rete-panel';
+  panel.style.cssText = 'display:none;position:absolute;top:52px;right:0;left:0;background:rgba(13,17,23,0.97);border-bottom:1px solid #30363d;z-index:600;padding:10px 14px;font-family:Barlow,sans-serif;font-size:12px';
+
+  var dots = { condotta_principale:'width:18px;height:4px;background:#00dd00;border-radius:2px', condotta_secondaria:'width:18px;height:3px;background:#f0a500;border-radius:2px', condotta_comiziale:'width:18px;height:2px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 6px,transparent 6px,transparent 10px)', ponti_tubo:'width:18px;height:3px;background:#ff00cc;border-radius:2px', idranti:'width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid #555;flex-shrink:0' };
+
+  var html =
+    // Sezione stato interventi
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid #30363d">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;align-self:center;margin-right:4px">Interventi</div>' +
+    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#e63946;flex-shrink:0"></div><span style="color:#e6edf3">Aperto</span></div>' +
+    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#58a6ff;flex-shrink:0"></div><span style="color:#e6edf3">In carico</span></div>' +
+    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#3fb950;flex-shrink:0"></div><span style="color:#e6edf3">Risolto</span></div>' +
+    '</div>' +
+    // Sezione rete idrica
+    '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;align-self:center;margin-right:4px">Rete</div>';
+
+  Object.keys(RETE_LAYERS).forEach(function(t) {
+    html += '<div id="toggle-row-' + t + '" onclick="toggleReteLayer(\'' + t + '\')" style="display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:2px 0"><div style="' + dots[t] + ';flex-shrink:0"></div><span style="color:#e6edf3">' + RETE_LAYERS[t].label + '</span></div>';
   });
-  div.innerHTML=html;
-  L.DomEvent.disableClickPropagation(div);
-  document.getElementById('map').appendChild(div);
+  html += '</div>';
+
+  panel.innerHTML = html;
+  L.DomEvent.disableClickPropagation(panel);
+  document.getElementById('map').addEventListener('click', function() {
+    panel.style.display = 'none';
+    var btn = document.getElementById('btn-layer');
+    if (btn) btn.style.borderColor = '';
+  });
+  document.getElementById('app').insertBefore(panel, document.getElementById('map'));
+}
+
+function toggleRetePanel() {
+  var panel = document.getElementById('rete-panel');
+  var btn = document.getElementById('btn-layer');
+  if (!panel) return;
+  var visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'flex';
+  panel.style.flexDirection = 'row';
+  panel.style.flexWrap = 'wrap';
+  if (btn) btn.style.borderColor = visible ? '' : 'var(--accent)';
 }
 
 function toggleReteLayer(table) {
-  reteLayersVisible[table]=!reteLayersVisible[table];
-  var row=document.getElementById('toggle-row-'+table);
-  if (reteLayersVisible[table]) { reteLayerGroups[table].addTo(map); if(row)row.style.opacity='1'; loadReteIdricaVisible(); }
-  else { map.removeLayer(reteLayerGroups[table]); if(row)row.style.opacity='0.35'; }
+  reteLayersVisible[table] = !reteLayersVisible[table];
+  var row = document.getElementById('toggle-row-' + table);
+  if (reteLayersVisible[table]) { reteLayerGroups[table].addTo(map); if (row) row.style.opacity='1'; loadReteIdricaVisible(); }
+  else { map.removeLayer(reteLayerGroups[table]); if (row) row.style.opacity='0.35'; }
 }
 
 var _origOpenForm = openFormAtPoint;
-openFormAtPoint = function(lat,lng) {
-  _origOpenForm(lat,lng);
-  setTimeout(function(){ injectReteInfo(lat,lng); },280);
+openFormAtPoint = function(lat, lng) {
+  _origOpenForm(lat, lng);
+  setTimeout(function() { injectReteInfo(lat, lng); }, 280);
 };
 
-function injectReteInfo(lat,lng) {
-  var old=document.getElementById('rete-info-box'); if(old)old.remove();
-  var info=nearestReteElement||findNearestRete(lat,lng);
-  nearestReteElement=null;
+function injectReteInfo(lat, lng) {
+  var old = document.getElementById('rete-info-box'); if (old) old.remove();
+  var info = nearestReteElement || findNearestRete(lat, lng);
+  nearestReteElement = null;
   if (!info) return;
-  var cfg=RETE_LAYERS[info.table]||{};
-  var col=cfg.color||'#58a6ff';
-  var box=document.createElement('div');
-  box.id='rete-info-box';
-  box.style.cssText='background:rgba(13,17,23,0.6);border:1px solid '+col+'55;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#e6edf3';
-  box.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#8b949e;margin-bottom:3px">Elemento rete</div><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;background:'+col+';border-radius:50%;flex-shrink:0"></div><span style="font-weight:600;color:'+col+'">'+info.tipo+'</span><span style="color:#8b949e;margin-left:4px;font-size:11px">'+info.nome+'</span></div>';
-  var fb=document.querySelector('.form-body');
-  if(fb) fb.insertBefore(box,fb.firstChild);
+  var cfg = RETE_LAYERS[info.table] || {};
+  var col = cfg.color || '#58a6ff';
+  var isIdrante = info.table === 'idranti';
+
+  var inputStyle = 'width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid ' + col + '44;border-radius:4px;color:#e6edf3;font-size:12px;padding:4px 8px;outline:none;font-family:Barlow,sans-serif;margin-bottom:6px';
+
+  var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#8b949e;margin-bottom:6px">Elemento rete</div>' +
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+    '<div style="width:10px;height:10px;background:' + col + ';border-radius:50%;flex-shrink:0"></div>' +
+    '<div style="position:relative;margin-bottom:8px">' +
+    '<div id="rete-tipo-display" onclick="toggleTipoMenu()" style="background:#1c2128;border:1px solid ' + col + '88;border-radius:4px;color:' + col + ';font-size:12px;font-weight:600;padding:6px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
+    '<span id="rete-tipo-label">' + info.tipo + '</span><span>▾</span>' +
+    '</div>' +
+    '<div id="rete-tipo-menu" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1c2128;border:1px solid ' + col + '88;border-radius:4px;z-index:9999;overflow:hidden">' +
+    ['Condotta principale','Condotta secondaria','Condotta comiziale','Ponte tubo','Idrante'].map(function(t) {
+      return '<div onclick="selectTipo(\''+t+'\')" style="padding:8px 10px;color:#e6edf3;font-size:12px;cursor:pointer;border-bottom:1px solid #30363d" onmouseover="this.style.background=\'#2d333b\'" onmouseout="this.style.background=\'transparent\'">' + t + '</div>';
+    }).join('') +
+    '</div>' +
+    '<input type="hidden" id="rete-tipo-edit" value="' + info.tipo + '">' +
+    '</div>' +
+    '</div>';
+
+  if (isIdrante) {
+    // Per idranti: nome e comizio
+    var parti = (info.nome || '').split(' - ');
+    var nomeIdr = parti[0] || '';
+    var comizioIdr = parti[1] || '';
+    html += '<label style="font-size:10px;color:#8b949e">ID Idrante</label>' +
+      '<input id="rete-nome-edit" value="' + nomeIdr + '" style="' + inputStyle + '">' +
+      '<label style="font-size:10px;color:#8b949e">Comizio</label>' +
+      '<input id="rete-comizio-edit" value="' + comizioIdr + '" style="' + inputStyle + '">';
+  } else {
+    // Per condotte: nome, diametro, materiale
+    html += '<label style="font-size:10px;color:#8b949e">Nome condotta</label>' +
+      '<input id="rete-nome-edit" value="' + (info.nome || '') + '" style="' + inputStyle + '">';
+    if (info.diametro !== null && info.diametro !== undefined) {
+      html += '<label style="font-size:10px;color:#8b949e">Diametro (mm)</label>' +
+        '<input id="rete-diam-edit" value="' + (info.diametro || '') + '" style="' + inputStyle + '">';
+    }
+    if (info.materiale !== null && info.materiale !== undefined) {
+      html += '<label style="font-size:10px;color:#8b949e">Materiale</label>' +
+        '<input id="rete-mat-edit" value="' + (info.materiale || '') + '" style="' + inputStyle + '">';
+    }
+  }
+
+  html += '<div style="font-size:10px;color:#8b949e;margin-top:2px">✏️ Modifica i dati se non corretti</div>';
+
+  var box = document.createElement('div');
+  box.id = 'rete-info-box';
+  box.style.cssText = 'background:rgba(13,17,23,0.6);border:1px solid ' + col + '55;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#e6edf3';
+  box.innerHTML = html;
+  var fb = document.querySelector('.form-body');
+  if (fb) fb.insertBefore(box, fb.firstChild);
 }
 
-function findNearestRete(lat,lng) {
-  var nearest=null,minD=Infinity;
-  Object.keys(reteLayerGroups).forEach(function(t){
-    reteLayerGroups[t].eachLayer(function(l){
-      var ll=l.getLatLng?l.getLatLng():(l.getBounds?l.getBounds().getCenter():null);
-      if(!ll)return;
-      var d=Math.pow(ll.lat-lat,2)+Math.pow(ll.lng-lng,2);
-      if(d<minD){minD=d;var cfg=RETE_LAYERS[t];nearest={tipo:cfg?cfg.label:t,nome:'—',table:t};}
+function findNearestRete(lat, lng) {
+  var nearest = null, minD = Infinity;
+  Object.keys(reteLayerGroups).forEach(function(t) {
+    if (t === 'idranti') return;
+    reteLayerGroups[t].eachLayer(function(l) {
+      var ll = l.getLatLng ? l.getLatLng() : (l.getBounds ? l.getBounds().getCenter() : null);
+      if (!ll) return;
+      var d = Math.pow(ll.lat - lat, 2) + Math.pow(ll.lng - lng, 2);
+      if (d < minD) {
+        minD = d;
+        // Usa i dati salvati sul layer se disponibili
+        nearest = l._reteData || { tipo:RETE_LAYERS[t]?RETE_LAYERS[t].label:t, nome:'---', table:t };
+      }
     });
   });
-  return minD<0.00015?nearest:null;
+  return minD < 0.00015 ? nearest : null;
+}
+function toggleTipoMenu() {
+  var menu = document.getElementById('rete-tipo-menu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function selectTipo(val) {
+  var input = document.getElementById('rete-tipo-edit');
+  var label = document.getElementById('rete-tipo-label');
+  var menu = document.getElementById('rete-tipo-menu');
+  if (input) input.value = val;
+  if (label) label.textContent = val;
+  if (menu) menu.style.display = 'none';
 }
 
 </script>
-</body>
-</html>
