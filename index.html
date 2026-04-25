@@ -964,13 +964,13 @@ textarea{resize:none;min-height:90px;}
 <div class="form-panel" id="form-panel">
   <div class="form-drag"></div>
   <div class="form-header">
-    <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-      <h2 style="margin:0"><div class="pulse"></div>Nuova segnalazione</h2>
+    <h2 style="margin:0"><div class="pulse"></div>Nuova segnalazione</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+      <div class="form-zona">
+        Zona: <span id="form-zona-name">—</span>
+        <span id="form-comune-name" style="color:var(--text2);font-size:11px"></span>
+      </div>
       <button onclick="chiudiForm()" style="background:rgba(255,255,255,0.07);border:1px solid #444;color:#aaa;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;padding:5px 12px;display:flex;align-items:center;gap:5px">← Indietro</button>
-    </div>
-    <div class="form-zona" style="margin-top:4px">
-      Zona: <span id="form-zona-name">—</span>
-      <span id="form-comune-name" style="color:var(--text2);font-size:11px"></span>
     </div>
   </div>
   <div class="form-body">
