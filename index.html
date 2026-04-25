@@ -887,6 +887,7 @@ textarea{resize:none;min-height:90px;}
 
 <style>
 @media (min-width:769px){ .desktop-only{ display:flex !important; } }
+@media (max-width:768px){ .desktop-only{ display:none !important; } }
 </style>
 </style>
 </head>
@@ -935,7 +936,7 @@ textarea{resize:none;min-height:90px;}
       <button class="stats-btn" id="btn-layer" onclick="toggleRetePanel(); event.stopPropagation();">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>Layer
       </button>
-      <button class="stats-btn desktop-only" onclick="openDownload()" style="display:none">
+      <button class="stats-btn desktop-only" onclick="openDownload()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download
       </button>
       <button class="stats-btn" onclick="doLogout()" style="background:rgba(230,57,70,0.1);border-color:var(--red);color:var(--red)">
