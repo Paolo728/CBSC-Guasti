@@ -106,28 +106,31 @@ html,body{height:100%;overflow:hidden;background:var(--dark);color:var(--text);f
 }
 .app-header-top{
   display:flex;align-items:center;justify-content:center;
-  padding:6px 16px;
+  padding:8px 16px;
   position:relative;
   border-bottom:1px solid var(--border);
+  min-height:44px;
 }
 .app-logo{
-  width:32px;height:28px;
+  width:32px;height:32px;
   background:transparent;border-radius:0;
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
   position:absolute;left:12px;
 }
-.app-logo svg{width:18px;height:18px;fill:white;}
+.app-logo svg{width:20px;height:20px;fill:white;}
 .app-title{
   font-family:'Barlow Condensed',sans-serif;
-  font-size:15px;font-weight:700;
+  font-size:17px;font-weight:700;
   letter-spacing:0.03em;
   text-align:center;
 }
 .app-title span{color:var(--text2);font-weight:400;}
 .app-header-menu{
   display:flex;align-items:center;justify-content:space-around;
-  padding:4px 8px;
+  padding:5px 8px;
+  min-height:42px;
+  gap:4px;
 }
 .zone-badge{
   padding:4px 10px;border-radius:20px;
@@ -670,15 +673,16 @@ textarea{resize:none;min-height:90px;}
   background: rgba(255,255,255,0.08);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 6px 12px;
+  padding: 8px 14px;
   color: var(--text2);
   font-family: 'Barlow', sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   display: flex; align-items: center; gap: 6px;
   flex-shrink: 0;
   transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
 .stats-btn:hover { border-color: var(--accent); color: var(--accent); }
 .stats-btn svg { width: 14px; height: 14px; }
@@ -901,20 +905,24 @@ textarea{resize:none;min-height:90px;}
     </div>
     <div class="app-header-menu">
       <div class="zone-badge" id="header-zone" style="display:none"></div>
+      <button class="stats-btn" onclick="openInterventi()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Interventi <span class="seg-count" id="seg-count" style="background:var(--red);color:white;border-radius:10px;padding:1px 6px;font-size:11px">0</span>
+      </button>
       <button class="stats-btn" onclick="openStats()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <line x1="18" y1="20" x2="18" y2="10"/>
           <line x1="12" y1="20" x2="12" y2="4"/>
           <line x1="6" y1="20" x2="6" y2="14"/>
         </svg>Stats
       </button>
       <button class="stats-btn" id="btn-layer" onclick="toggleRetePanel(); event.stopPropagation();">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
         </svg>Layer
       </button>
       <button class="stats-btn" onclick="doLogout()" style="background:rgba(230,57,70,0.1);border-color:var(--red);color:var(--red)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
           <polyline points="16 17 21 12 16 7"/>
           <line x1="21" y1="12" x2="9" y2="12"/>
@@ -923,15 +931,17 @@ textarea{resize:none;min-height:90px;}
     </div>
   </div>
 
-  <div id="map"<div id="map" style="position:relative">
+  <div id="map" style="position:relative">
     <div class="tap-hint" id="tap-hint">
       <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
       Premi il bottone rosso oppure tocca la mappa
     </div>
-    
-    <div class="segnalazioni-btn" id="seg-btn" onclick="openInterventi()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      Interventi <span class="seg-count" id="seg-count">0</span>
+
+    <div class="map-legend" id="map-legend">
+      <div class="legend-title">Interventi</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#e63946"></div>Aperto</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#58a6ff"></div>In carico</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#3fb950"></div>Risolto</div>
     </div>
 
     <!-- BOTTONE ROSSO PRINCIPALE -->
@@ -1070,6 +1080,11 @@ textarea{resize:none;min-height:90px;}
       <button class="filter-btn" id="f-zona-CEDRINO" onclick="filterZona('CEDRINO')" style="font-size:11px">Cedrino</button>
       <button class="filter-btn" id="f-zona-POSADA_NORD" onclick="filterZona('POSADA_NORD')" style="font-size:11px">P.Nord</button>
       <button class="filter-btn" id="f-zona-POSADA_SUD" onclick="filterZona('POSADA_SUD')" style="font-size:11px">P.Sud</button>
+    </div>
+    <div class="interventi-filter" style="margin-top:-4px">
+      <select id="f-comune" onchange="filterComune(this.value)" style="background:var(--dark3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:4px 8px;font-family:Barlow,sans-serif;cursor:pointer;flex:1">
+        <option value="">Tutti i comuni</option>
+      </select>
     </div>
     <div id="interventi-list"></div>
   </div>
@@ -1441,9 +1456,9 @@ function openFormAtPoint(lat, lng) {
   fetch(SB_URL + '/rest/v1/rpc/get_comune_by_point', {
     method: 'POST', headers: sbHeaders(),
     body: JSON.stringify({ lat: lat, lng: lng })
-  }).then(function(r) { return r.json(); }).then(function(res) {
-    var nomeComune = typeof res === 'string' ? res : (res && res[0] ? res[0] : '');
-    if (nomeComune && comuneEl) comuneEl.textContent = ' · ' + nomeComune;
+  }).then(function(r) { return r.text(); }).then(function(res) {
+    var nomeComune = res ? res.replace(/^"|"$/g, '').trim() : '';
+    if (nomeComune && nomeComune !== 'null' && comuneEl) comuneEl.textContent = ' · ' + nomeComune;
   }).catch(function(){});
 
   document.getElementById('form-panel').classList.add('open');
@@ -1527,8 +1542,8 @@ async function inviaForm() {
     });
     if (r.ok) {
       var res = await r.json();
-      if (res) {
-        comune = typeof res === 'string' ? res : (Array.isArray(res) ? res[0] : String(res));
+      comune = typeof res === 'string' ? res.replace(/^"|"$/g, '').trim() : '';
+      if (comune && comune !== 'null') {
         var el = document.getElementById('form-comune-name');
         if (el) el.textContent = ' · ' + comune;
       }
@@ -1674,7 +1689,8 @@ async function loadSegnalazioni() {
           timestamp:         f.timestamp?.stringValue || '',
           preso_da:          f.preso_da?.stringValue || '',
           chiuso_da:         f.chiuso_da?.stringValue || '',
-          chiuso_il:         f.chiuso_il?.stringValue || ''
+          chiuso_il:         f.chiuso_il?.stringValue || '',
+          comune:            f.comune?.stringValue || ''
         };
         if (seg.ttl && Date.now() > seg.ttl) return;
         addMarkerToMap(seg);
@@ -2527,6 +2543,7 @@ function stampaPDF(id) {
 // ════════════════════════════════════════
 var _filtroAttivo = 'tutti';
 var _filtroZona   = 'tutti';
+var _filtroComune = '';
 
 function filterZona(zona) {
   _filtroZona = zona;
@@ -2534,6 +2551,25 @@ function filterZona(zona) {
   var btn = document.getElementById('f-zona-' + zona);
   if (btn) btn.classList.add('active');
   renderListaInterventi();
+}
+
+function filterComune(comune) {
+  _filtroComune = comune;
+  renderListaInterventi();
+}
+
+function populateComuneFilter(segs) {
+  var sel = document.getElementById('f-comune');
+  if (!sel) return;
+  var comuni = [...new Set(segs.map(function(s) { return s.comune || ''; }).filter(Boolean))].sort();
+  var current = sel.value;
+  sel.innerHTML = '<option value="">Tutti i comuni</option>';
+  comuni.forEach(function(c) {
+    var opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    if (c === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
 }
 
 function cercaPerCodice(query) {
@@ -2623,6 +2659,10 @@ function renderListaInterventi() {
 
   // Filtra per zona
   if (_filtroZona !== 'tutti') segs = segs.filter(function(s) { return s.zona === _filtroZona; });
+  // Filtra per comune
+  if (_filtroComune) segs = segs.filter(function(s) { return s.comune === _filtroComune; });
+  // Popola select comuni
+  populateComuneFilter(Object.values(segMarkers).map(function(m) { return m._segData; }).filter(Boolean));
 
   if (segs.length === 0) {
     list.innerHTML = '<div class="interventi-empty">Nessun intervento ' + (_filtroAttivo !== 'tutti' ? _filtroAttivo : '') + '</div>';
@@ -2831,24 +2871,16 @@ async function loadReteLayer(table, minLng, maxLng, minLat, maxLat) {
 function buildReteToggleUI() {
   var panel = document.createElement('div');
   panel.id = 'rete-panel';
-  panel.style.cssText = 'display:none;position:absolute;top:80px;right:0;left:0;background:rgba(13,17,23,0.97);border-bottom:1px solid #30363d;z-index:600;padding:10px 14px;font-family:Barlow,sans-serif;font-size:12px';
+  panel.style.cssText = 'display:none;position:absolute;top:90px;right:0;left:0;background:rgba(13,17,23,0.97);border-bottom:1px solid #30363d;z-index:600;padding:10px 14px;font-family:Barlow,sans-serif;font-size:12px';
 
   var dots = { condotta_principale:'width:18px;height:4px;background:#00dd00;border-radius:2px', condotta_secondaria:'width:18px;height:3px;background:#f0a500;border-radius:2px', condotta_comiziale:'width:18px;height:2px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 6px,transparent 6px,transparent 10px)', ponti_tubo:'width:18px;height:3px;background:#ff00cc;border-radius:2px', idranti:'width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid #555;flex-shrink:0' };
 
   var html =
-    // Sezione stato interventi
-    '<div style="display:flex;gap:16px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid #30363d">' +
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;align-self:center;margin-right:4px">Interventi</div>' +
-    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#e63946;flex-shrink:0"></div><span style="color:#e6edf3">Aperto</span></div>' +
-    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#58a6ff;flex-shrink:0"></div><span style="color:#e6edf3">In carico</span></div>' +
-    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#3fb950;flex-shrink:0"></div><span style="color:#e6edf3">Risolto</span></div>' +
-    '</div>' +
-    // Sezione rete idrica
-    '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;align-self:center;margin-right:4px">Rete</div>';
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#8b949e;margin-bottom:8px">Rete idrica — attiva/disattiva layer</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
 
   Object.keys(RETE_LAYERS).forEach(function(t) {
-    html += '<div id="toggle-row-' + t + '" onclick="toggleReteLayer(\'' + t + '\')" style="display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:2px 0"><div style="' + dots[t] + ';flex-shrink:0"></div><span style="color:#e6edf3">' + RETE_LAYERS[t].label + '</span></div>';
+    html += '<div id="toggle-row-' + t + '" onclick="toggleReteLayer(\'' + t + '\')" style="display:flex;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:7px 10px;background:rgba(255,255,255,0.05);border-radius:8px;border:1px solid #30363d"><div style="' + dots[t] + ';flex-shrink:0"></div><span style="color:#e6edf3;font-size:12px;font-weight:500">' + RETE_LAYERS[t].label + '</span></div>';
   });
   html += '</div>';
 
