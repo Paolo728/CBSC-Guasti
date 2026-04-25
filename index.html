@@ -1484,12 +1484,26 @@ function handleFoto(input) {
   });
 }
 
-function inviaForm() {
+async function inviaForm() {
   var desc = document.getElementById('f-desc').value.trim();
   var nome = document.getElementById('f-nome').value.trim() || currentUser;
   if (!selTipoVal) { showToast('Seleziona il tipo di guasto', 'error'); return; }
   if (!selPrioVal) { showToast('Seleziona la priorità', 'error'); return; }
   if (!desc)        { showToast('Inserisci una descrizione', 'error'); return; }
+
+  // Cerca il comune tramite Supabase
+  var comune = '';
+  try {
+    var r = await fetch(SB_URL + '/rest/v1/rpc/get_comune_by_point', {
+      method: 'POST',
+      headers: sbHeaders(),
+      body: JSON.stringify({ lat: selectedLat, lng: selectedLng })
+    });
+    if (r.ok) {
+      var res = await r.json();
+      if (res) comune = res;
+    }
+  } catch(e) { console.warn('Comune non trovato:', e); }
 
   var seg = {
     codice: generaCodice(),
@@ -1497,6 +1511,7 @@ function inviaForm() {
     descrizione: desc, segnalato_da: nome,
     zona: selectedZona || 'SCONOSCIUTA',
     zona_label: selectedZona ? ZONE_LABELS[selectedZona] : 'Fuori zona',
+    comune: comune,
     lat: selectedLat, lng: selectedLng,
     timestamp: new Date().toISOString(),
     timestamp_display: new Date().toLocaleString('it-IT'),
@@ -1587,6 +1602,7 @@ async function saveToFirebase(seg) {
     timestamp_display: { stringValue: seg.timestamp_display },
     stato:             { stringValue: seg.stato },
     ttl:               { integerValue: String(seg.ttl) },
+    comune:            { stringValue: seg.comune || '' },
     elemento_rete:     { stringValue: seg.elemento_rete || '' },
     elemento_tipo:     { stringValue: seg.elemento_tipo || '' },
     elemento_diametro: { stringValue: seg.elemento_diametro || '' },
@@ -1880,6 +1896,7 @@ async function sendToSheets(seg) {
     data_ora:     seg.timestamp_display || '',
     zona:         seg.zona_label || seg.zona || '',
     zona_key:     seg.zona || '',
+    comune:       seg.comune || '',
     tipo:         seg.tipo || '',
     priorita:     seg.priorita || '',
     descrizione:  seg.descrizione || '',
@@ -1892,6 +1909,11 @@ async function sendToSheets(seg) {
     chiuso_il:    seg.chiuso_il || '',
     maps_url:     seg.lat ? 'https://www.google.com/maps?q=' + seg.lat + ',' + seg.lng : '',
     foto:         seg.foto || [],
+    elemento_tipo:     seg.elemento_tipo || '',
+    elemento_rete:     seg.elemento_rete || '',
+    elemento_diametro: seg.elemento_diametro || '',
+    elemento_materiale:seg.elemento_materiale || '',
+    elemento_comizio:  seg.elemento_comizio || '',
     _action:      seg._action || 'insert'
   };
   console.log('sendToSheets payload zona_key:', payload.zona_key, 'zona:', payload.zona);
@@ -1929,6 +1951,7 @@ async function sendTelegram(seg) {
     prioEmoji + ' *Priorità:* ' + seg.priorita + '\n' +
     '🔧 *Tipo:* ' + seg.tipo + '\n' +
     '📍 *Zona:* ' + seg.zona_label + '\n' +
+    (seg.comune ? '🏘 *Comune:* ' + seg.comune + '\n' : '') +
     reteInfo +
     '📝 *Descrizione:* ' + seg.descrizione + '\n' +
     '👤 *Segnalato da:* ' + seg.segnalato_da + '\n' +
@@ -2385,6 +2408,7 @@ function stampaPDF(id) {
     '<tr><td>Priorità</td><td><span class="badge" style="background:' + prioColor + '">' + (seg.priorita||'—') + '</span></td></tr>' +
     '<tr><td>Stato</td><td><span class="badge" style="background:' + statoColor + '">' + (seg.stato||'—') + '</span></td></tr>' +
     '<tr><td>Zona</td><td>' + (seg.zona_label||'—') + '</td></tr>' +
+    (seg.comune ? '<tr style="background:#fafafa"><td>Comune</td><td><strong>' + seg.comune + '</strong></td></tr>' : '') +
     '<tr><td>Segnalato da</td><td>' + (seg.segnalato_da||'—') + '</td></tr>' +
     '<tr><td>Data / Ora</td><td>' + (seg.timestamp_display||'—') + '</td></tr>' +
     (seg.preso_da ? '<tr><td>Preso in carico</td><td>' + seg.preso_da + '</td></tr>' : '') +
