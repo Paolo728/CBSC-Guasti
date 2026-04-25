@@ -915,12 +915,7 @@ textarea{resize:none;min-height:90px;}
       <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
       Premi il bottone rosso oppure tocca la mappa
     </div>
-    <div class="map-legend" id="map-legend">
-      <div class="legend-title">Interventi</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#e63946"></div>Aperto</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#58a6ff"></div>In carico</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#3fb950"></div>Risolto</div>
-    </div>
+    
     <div class="segnalazioni-btn" id="seg-btn" onclick="openInterventi()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       Interventi <span class="seg-count" id="seg-count">0</span>
@@ -2682,7 +2677,19 @@ var nearestReteElement = null;
 function initReteIdrica() {
   Object.keys(RETE_LAYERS).forEach(function(t) { reteLayerGroups[t] = L.layerGroup().addTo(map); });
   map.on('moveend', loadReteIdricaVisible);
-  map.on('zoomend', loadReteIdricaVisible);
+  map.on('zoomend', function() {
+    var z = map.getZoom();
+    Object.keys(RETE_LAYERS).forEach(function(t) {
+      if (!reteLayersVisible[t]) return;
+      var minZ = RETE_LAYERS[t].minZoom || MIN_ZOOM_RETE;
+      if (z < minZ) {
+        reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:0,fillOpacity:0}); });
+      } else {
+        reteLayerGroups[t].eachLayer(function(l) { if(l.setStyle) l.setStyle({opacity:1,fillOpacity:0.95}); });
+      }
+    });
+    loadReteIdricaVisible();
+  });
   buildReteToggleUI();
   loadReteIdricaVisible();
 }
@@ -2766,12 +2773,26 @@ function buildReteToggleUI() {
   var panel = document.createElement('div');
   panel.id = 'rete-panel';
   panel.style.cssText = 'display:none;position:absolute;top:52px;right:0;left:0;background:rgba(13,17,23,0.97);border-bottom:1px solid #30363d;z-index:600;padding:10px 14px;font-family:Barlow,sans-serif;font-size:12px';
+
   var dots = { condotta_principale:'width:18px;height:4px;background:#00dd00;border-radius:2px', condotta_secondaria:'width:18px;height:3px;background:#f0a500;border-radius:2px', condotta_comiziale:'width:18px;height:2px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 6px,transparent 6px,transparent 10px)', ponti_tubo:'width:18px;height:3px;background:#ff00cc;border-radius:2px', idranti:'width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid #555;flex-shrink:0' };
-  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px 16px">';
+
+  var html =
+    // Sezione stato interventi
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid #30363d">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;align-self:center;margin-right:4px">Interventi</div>' +
+    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#e63946;flex-shrink:0"></div><span style="color:#e6edf3">Aperto</span></div>' +
+    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#58a6ff;flex-shrink:0"></div><span style="color:#e6edf3">In carico</span></div>' +
+    '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#3fb950;flex-shrink:0"></div><span style="color:#e6edf3">Risolto</span></div>' +
+    '</div>' +
+    // Sezione rete idrica
+    '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8b949e;align-self:center;margin-right:4px">Rete</div>';
+
   Object.keys(RETE_LAYERS).forEach(function(t) {
-    html += '<div id="toggle-row-' + t + '" onclick="toggleReteLayer(\'' + t + '\')" style="display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:4px 0"><div style="' + dots[t] + ';flex-shrink:0"></div><span style="color:#e6edf3">' + RETE_LAYERS[t].label + '</span></div>';
+    html += '<div id="toggle-row-' + t + '" onclick="toggleReteLayer(\'' + t + '\')" style="display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:2px 0"><div style="' + dots[t] + ';flex-shrink:0"></div><span style="color:#e6edf3">' + RETE_LAYERS[t].label + '</span></div>';
   });
   html += '</div>';
+
   panel.innerHTML = html;
   L.DomEvent.disableClickPropagation(panel);
   document.getElementById('map').addEventListener('click', function() {
