@@ -677,16 +677,18 @@ textarea{resize:none;min-height:90px;}
   background: rgba(255,255,255,0.08);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 7px 11px;
+  padding: 7px 10px;
   color: var(--text2);
   font-family: 'Barlow', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  display: flex; align-items: center; gap: 6px;
-  flex-shrink: 0;
+  display: flex; align-items: center; gap: 5px;
+  flex: 1;
+  justify-content: center;
   transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
 }
 .stats-btn:hover { border-color: var(--accent); color: var(--accent); }
 .stats-btn svg { width: 14px; height: 14px; }
@@ -960,7 +962,7 @@ textarea{resize:none;min-height:90px;}
   <div class="form-header">
     <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
       <h2 style="margin:0"><div class="pulse"></div>Nuova segnalazione</h2>
-      <button onclick="chiudiForm()" style="background:rgba(230,57,70,0.12);border:1px solid var(--red);color:var(--red);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;padding:5px 12px;display:flex;align-items:center;gap:5px"><svg viewBox='0 0 24 24' width='12' height='12' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/><polyline points='16 17 21 12 16 7'/><line x1='21' y1='12' x2='9' y2='12'/></svg>Esci</button>
+      <button onclick="chiudiForm()" style="background:rgba(230,57,70,0.12);border:1px solid var(--red);color:var(--red);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;padding:5px 12px;display:flex;align-items:center;gap:5px"><svg viewBox='0 0 24 24' width='12' height='12' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/><polyline points='16 17 21 12 16 7'/><line x1='21' y1='12' x2='9' y2='12'/></svg>← Indietro</button>
     </div>
     <div class="form-zona" style="margin-top:4px">
       Zona: <span id="form-zona-name">—</span>
