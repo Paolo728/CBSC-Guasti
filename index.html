@@ -888,18 +888,18 @@ textarea{resize:none;min-height:90px;}
 /* ── DESKTOP: pannelli come modali centrate ── */
 @media (min-width:769px) {
 
-  /* Overlay semitrasparente comune */
+  /* Overlay semitrasparente comune — solo form, interventi, statistiche */
   .form-panel,
   .interventi-panel,
-  .stats-panel {
+  #stats-panel {
     inset: unset !important;
-    top: 50% !important;
+    top: calc(50% + 42px) !important;
     left: 50% !important;
     right: unset !important;
     bottom: unset !important;
-    width: 700px !important;
-    max-width: 90vw !important;
-    max-height: 85vh !important;
+    width: 880px !important;
+    max-width: 92vw !important;
+    max-height: 78vh !important;
     border-radius: 16px !important;
     border: 1px solid var(--border) !important;
     box-shadow: 0 24px 60px rgba(0,0,0,0.7) !important;
@@ -911,7 +911,7 @@ textarea{resize:none;min-height:90px;}
 
   .form-panel.open,
   .interventi-panel.open,
-  .stats-panel.open {
+  #stats-panel.open {
     transform: translate(-50%, -50%) scale(1) !important;
     opacity: 1 !important;
     pointer-events: auto !important;
@@ -920,7 +920,7 @@ textarea{resize:none;min-height:90px;}
   /* Backdrop scuro dietro il modale */
   .form-panel.open::before,
   .interventi-panel.open::before,
-  .stats-panel.open::before {
+  #stats-panel.open::before {
     content: '';
     position: fixed;
     inset: 0;
@@ -929,20 +929,9 @@ textarea{resize:none;min-height:90px;}
     pointer-events: none;
   }
 
-  /* Form panel specifico — altezza automatica */
+  /* Form panel specifico — scroll interno */
   .form-panel {
     overflow-y: auto !important;
-  }
-
-  /* Interventi — larghezza un po' più larga */
-  .interventi-panel {
-    width: 760px !important;
-  }
-
-  /* Stats e Archivio — un po' più larghi per i grafici */
-  #stats-panel,
-  #archivio-panel {
-    width: 820px !important;
   }
 }
 
