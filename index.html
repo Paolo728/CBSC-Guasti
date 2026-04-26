@@ -1074,7 +1074,13 @@ textarea{resize:none;min-height:90px;}
 <div class="interventi-panel" id="interventi-panel">
   <div class="interventi-header">
     <h2>📋 Interventi</h2>
-    <button class="interventi-close" onclick="closeInterventi()">✕</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="stampaListaInterventi()" style="background:rgba(88,166,255,0.1);border:1px solid #58a6ff;color:#58a6ff;padding:5px 12px;border-radius:6px;font-family:Barlow,sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Stampa
+      </button>
+      <button class="interventi-close" onclick="closeInterventi()">✕</button>
+    </div>
   </div>
   <div class="interventi-body" id="interventi-body">
     <!-- Barra ricerca -->
@@ -2935,6 +2941,99 @@ function renderListaInterventi() {
     '</div>';
   });
   list.innerHTML = html;
+}
+
+function stampaListaInterventi() {
+  var segs = Object.values(segMarkers).map(function(m) { return m._segData; }).filter(Boolean);
+  segs.sort(function(a, b) {
+    if (a.stato !== b.stato) {
+      if (a.stato === 'APERTO') return -1;
+      if (b.stato === 'APERTO') return 1;
+      if (a.stato === 'PRESO_IN_CARICO') return -1;
+      if (b.stato === 'PRESO_IN_CARICO') return 1;
+    }
+    return (b.timestamp_display || '').localeCompare(a.timestamp_display || '');
+  });
+  if (_filtroAttivo === 'aperti')  segs = segs.filter(function(s) { return s.stato === 'APERTO'; });
+  if (_filtroAttivo === 'carico')  segs = segs.filter(function(s) { return s.stato === 'PRESO_IN_CARICO'; });
+  if (_filtroAttivo === 'risolti') segs = segs.filter(function(s) { return s.stato === 'RISOLTO'; });
+  if (_filtroZona !== 'tutti')     segs = segs.filter(function(s) { return s.zona === _filtroZona; });
+  if (_filtroComune)               segs = segs.filter(function(s) { return s.comune === _filtroComune; });
+
+  var filtroStatoLabel = { tutti:'Tutti', aperti:'Aperti', carico:'In carico', risolti:'Risolti' }[_filtroAttivo] || 'Tutti';
+  var filtroZonaLabel  = _filtroZona === 'tutti' ? 'Tutte le zone' : (ZONE_LABELS[_filtroZona] || _filtroZona);
+  var dataStampa = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  var statoColori = { 'APERTO':'#c1121f', 'PRESO_IN_CARICO':'#1a73e8', 'RISOLTO':'#2d8a40' };
+  var statoLabel  = { 'APERTO':'APERTO', 'PRESO_IN_CARICO':'IN CARICO', 'RISOLTO':'RISOLTO' };
+  var prioColori  = { 'ALTA':'#c1121f', 'MEDIA':'#d4660a', 'BASSA':'#2d8a40' };
+
+  var righe = '';
+  segs.forEach(function(seg, i) {
+    var sc = statoColori[seg.stato] || '#666';
+    var sl = statoLabel[seg.stato]  || seg.stato;
+    var pc = prioColori[seg.priorita] || '#666';
+    righe +=
+      '<tr style="background:' + (i % 2 === 0 ? '#ffffff' : '#f9f9f9') + '">' +
+      '<td style="padding:8px 10px;font-family:monospace;font-size:12px;font-weight:700;color:#0d47a1;white-space:nowrap">' + (seg.codice || '—') + '</td>' +
+      '<td style="padding:8px 10px;font-size:12px">' + (seg.tipo || '—') + '</td>' +
+      '<td style="padding:8px 10px;font-size:12px">' + (seg.zona_label || seg.zona || '—') + '</td>' +
+      '<td style="padding:8px 10px;font-size:11px;white-space:nowrap">' + (seg.timestamp_display || '—') + '</td>' +
+      '<td style="padding:8px 10px;text-align:center"><span style="background:' + pc + ';color:white;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700">' + (seg.priorita || '—') + '</span></td>' +
+      '<td style="padding:8px 10px;text-align:center"><span style="background:' + sc + ';color:white;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700">' + sl + '</span></td>' +
+      '<td style="padding:8px 10px;font-size:11px;color:#555">' + (seg.segnalato_da || '—') + '</td>' +
+      '<td style="padding:8px 10px;font-size:11px;color:#1a73e8;font-weight:600">' + (seg.preso_da || '—') + '</td>' +
+      '<td style="padding:8px 10px;font-size:11px;color:#2d8a40;font-weight:600">' + (seg.chiuso_da || '—') + '</td>' +
+      '<td style="padding:8px 10px;font-size:11px;color:#555;max-width:200px">' + (seg.descrizione || '—').substring(0, 80) + '</td>' +
+      '</tr>';
+  });
+
+  var html = '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">' +
+    '<title>CBSC — Lista Interventi</title>' +
+    '<style>' +
+    'body{font-family:Arial,sans-serif;margin:0;padding:20px;color:#222;font-size:12px}' +
+    '@media print{body{padding:10px} .no-print{display:none} thead{display:table-header-group}}' +
+    'table{width:100%;border-collapse:collapse;margin-top:16px}' +
+    'thead tr{background:#0d47a1;color:white}' +
+    'th{padding:9px 10px;text-align:left;font-size:11px;font-weight:700;letter-spacing:0.5px}' +
+    'td{border-bottom:1px solid #e0e0e0;vertical-align:top}' +
+    'tr:last-child td{border-bottom:none}' +
+    '.header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #0d47a1;padding-bottom:12px;margin-bottom:4px}' +
+    '.header-left h1{margin:0 0 4px 0;font-size:18px;color:#0d47a1;font-weight:700}' +
+    '.header-left p{margin:2px 0;font-size:11px;color:#666}' +
+    '.filtri{display:flex;gap:16px;margin:12px 0;font-size:11px;color:#555}' +
+    '.filtri span{background:#f0f4ff;border:1px solid #c5d0e8;padding:3px 10px;border-radius:4px}' +
+    '.totale{font-size:12px;color:#0d47a1;font-weight:700;margin-top:12px;text-align:right}' +
+    '.footer{margin-top:20px;text-align:center;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:8px}' +
+    '</style></head><body>' +
+    '<div class="header">' +
+    '<div class="header-left">' +
+    '<h1>CBSC — Consorzio di Bonifica della Sardegna Centrale</h1>' +
+    '<p>Gestione Segnalazioni Guasti — Lista Interventi</p>' +
+    '</div>' +
+    '<div style="text-align:right;font-size:11px;color:#666"><strong>Stampato il:</strong><br>' + dataStampa + '</div>' +
+    '</div>' +
+    '<div class="filtri">' +
+    '<span>Stato: <strong>' + filtroStatoLabel + '</strong></span>' +
+    '<span>Zona: <strong>' + filtroZonaLabel + '</strong></span>' +
+    (_filtroComune ? '<span>Comune: <strong>' + _filtroComune + '</strong></span>' : '') +
+    '</div>' +
+    '<table>' +
+    '<thead><tr>' +
+    '<th>Codice</th><th>Tipo</th><th>Zona</th><th>Data/Ora</th><th>Priorità</th><th>Stato</th><th>Segnalato da</th><th>Preso da</th><th>Chiuso da</th><th>Descrizione</th>' +
+    '</tr></thead>' +
+    '<tbody>' + righe + '</tbody>' +
+    '</table>' +
+    '<div class="totale">Totale interventi: ' + segs.length + '</div>' +
+    '<div class="footer">CBSC — Segnalazioni Guasti | Documento generato automaticamente</div>' +
+    '<div class="no-print" style="margin-top:20px;text-align:center">' +
+    '<button onclick="window.print()" style="background:#0d47a1;color:white;border:none;padding:10px 28px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Stampa / Salva PDF</button>' +
+    '</div>' +
+    '</body></html>';
+
+  var w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
 }
 
 function vaiAlMarker(id) {
