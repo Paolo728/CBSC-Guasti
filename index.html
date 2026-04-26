@@ -2351,11 +2351,14 @@ async function loadStats() {
     var respA = await fetch(FB_BASE + '/segnalazioni?pageSize=1000');
     var dataA = await respA.json();
     var allSegs = dataA.documents || [];
-    var active = allSegs.filter(function(d) {
-      var stato = d.fields?.stato?.stringValue || 'APERTO';
-      return stato === 'APERTO' || stato === 'PRESO_IN_CARICO';
+    // Conta solo i marker visibili sulla mappa (rispetta il filtro 7 giorni)
+    var activeCount = 0;
+    Object.values(segMarkers).forEach(function(m) {
+      if (m._segData && (m._segData.stato === 'APERTO' || m._segData.stato === 'PRESO_IN_CARICO')) {
+        activeCount++;
+      }
     });
-    renderStats(docs, active.length, allSegs);
+    renderStats(docs, activeCount, allSegs);
   } catch(e) {
     document.getElementById('stats-body').innerHTML = '<div class="stats-empty">Errore caricamento statistiche</div>';
   }
@@ -2396,7 +2399,7 @@ function renderStats(docs, activeCount, allSegs) {
   var monthSegs = tutteSegs.filter(function(r) { return r.anno === thisYear && r.mese === thisMonth + 1; });
   var totAnno   = yearSegs.length;
   var totMese   = monthSegs.length;
-  // Risolte = solo quelle con stato RISOLTO nelle segnalazioni attive
+  // Risolte = quelle con stato RISOLTO in segnalazioni (rimangono su Firebase anche dopo 7gg)
   var risolte   = tutteSegs.filter(function(r) { return r.stato === 'RISOLTO'; }).length;
 
   var months = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
@@ -2419,7 +2422,7 @@ function renderStats(docs, activeCount, allSegs) {
 
   // Sheets banner
   if (SHEETS_WEBHOOK_URL) {
-    html += '<div class="sheets-banner"><svg viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Google Sheets attivo</strong> — ogni segnalazione viene registrata automaticamente nel foglio di calcolo.</span></div>';
+    // banner Sheets rimosso
   } else {
     html += '<div class="ttl-info">📋 <strong>Google Sheets non configurato.</strong> Imposta il webhook nel file index.html per abilitare l\'export automatico.</div>';
   }
