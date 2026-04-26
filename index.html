@@ -1805,19 +1805,12 @@ function addMarkerToMap(seg) {
 
   var btnPDF = '<button onclick="stampaPDF(\'' + seg.id + '\')" style="margin-top:6px;width:100%;padding:6px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;font-size:12px;font-weight:700;cursor:pointer">Esporta PDF</button>';
 
-  // Sezione foto nel popup
-  var fotoHtml = '';
-  if (seg.foto_links) {
-    var links = seg.foto_links.split(' | ').filter(function(l) { return l.trim(); });
-    if (links.length > 0) {
-      fotoHtml = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #30363d">' +
-        '<div style="font-size:10px;color:#8b949e;margin-bottom:4px">FOTO ALLEGATE</div>';
-      links.forEach(function(link, i) {
-        fotoHtml += '<a href="' + link + '" target="_blank" style="display:inline-block;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;color:#58a6ff;padding:3px 8px;border-radius:4px;font-size:11px;text-decoration:none;margin-right:4px;margin-bottom:4px">📷 Foto ' + (i+1) + '</a>';
-      });
-      fotoHtml += '</div>';
-    }
-  }
+  // Sezione foto nel popup — placeholder aggiornato dinamicamente al popupopen
+  var fotoPlaceholderId = 'foto-seg-' + seg.id;
+  var fotoHtml = '<div id="' + fotoPlaceholderId + '" style="margin-top:6px">' +
+    '<div style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#484f58">' +
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+    'Carico foto...</div></div>';
 
   marker.bindPopup(
     '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px;min-width:200px">' +
@@ -1833,6 +1826,20 @@ function addMarkerToMap(seg) {
     '</div>'
   , { maxWidth: 280 });
 
+  // Ogni volta che il popup si apre, aggiorna la sezione foto dal vivo
+  marker.on('popupopen', function() {
+    var el = document.getElementById(fotoPlaceholderId);
+    if (!el) return;
+    // Se la cache locale già ha le foto, mostra subito
+    var cached = window._segCache && window._segCache[seg.id];
+    if (cached && cached.foto_links) {
+      el.innerHTML = buildFotoPopupHtml(cached.foto_links);
+      return;
+    }
+    // Altrimenti fetch fresco da Firestore con retry automatico
+    fetchFotoLinksConRetry(seg.id, el, 0);
+  });
+
   clusterGroup.addLayer(marker);
   segMarkers[seg.id] = marker;
   marker._segData = seg;
@@ -1841,6 +1848,77 @@ function addMarkerToMap(seg) {
   // Cache per download
   if (!window._segCache) window._segCache = {};
   window._segCache[seg.id] = seg;
+}
+
+// ════════════════════════════════════════
+// FOTO POPUP — helper per fetch live con retry
+// ════════════════════════════════════════
+
+// Costruisce l'HTML della sezione foto dato il valore del campo foto_links
+function buildFotoPopupHtml(fotoLinks) {
+  if (!fotoLinks) return '';
+  var links = fotoLinks.split(' | ').filter(function(l) { return l.trim(); });
+  if (links.length === 0) return '';
+  var html = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #30363d">' +
+    '<div style="font-size:10px;color:#8b949e;margin-bottom:5px;display:flex;align-items:center;gap:4px">' +
+    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+    'FOTO ALLEGATE</div>';
+  links.forEach(function(link, i) {
+    html += '<a href="' + link + '" target="_blank" ' +
+      'style="display:inline-flex;align-items:center;gap:4px;' +
+      'background:rgba(88,166,255,0.1);border:1px solid #58a6ff;' +
+      'color:#58a6ff;padding:4px 8px;border-radius:4px;' +
+      'font-size:11px;text-decoration:none;margin-right:4px;margin-bottom:4px">' +
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+      'Foto ' + (i + 1) + '</a>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// Fetch foto_links da Firestore con retry esponenziale (max 5 tentativi, ogni 2s)
+async function fetchFotoLinksConRetry(segId, el, tentativo) {
+  try {
+    var resp = await fetch(FB_BASE + '/segnalazioni/' + segId);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var doc = await resp.json();
+    var links = (doc.fields && doc.fields.foto_links && doc.fields.foto_links.stringValue) || '';
+
+    if (links) {
+      // Aggiorna cache locale
+      if (window._segCache && window._segCache[segId]) {
+        window._segCache[segId].foto_links = links;
+      }
+      // Aggiorna anche il _segData del marker
+      if (segMarkers[segId]) {
+        segMarkers[segId]._segData.foto_links = links;
+      }
+      // Mostra le foto nel placeholder (solo se il popup è ancora aperto)
+      if (el && el.isConnected) {
+        el.innerHTML = buildFotoPopupHtml(links);
+      }
+    } else if (tentativo < 5) {
+      // Nessuna foto ancora — riprova tra 2 secondi
+      if (el && el.isConnected) {
+        var dots = '.'.repeat(tentativo + 1);
+        el.innerHTML =
+          '<div style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#484f58">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+          'Attendo foto' + dots + '</div>';
+        setTimeout(function() { fetchFotoLinksConRetry(segId, el, tentativo + 1); }, 2000);
+      }
+    } else {
+      // Nessuna foto dopo 5 tentativi — nascondi il placeholder
+      if (el && el.isConnected) el.innerHTML = '';
+    }
+  } catch(e) {
+    // Errore di rete — riprova se non abbiamo esaurito i tentativi
+    if (tentativo < 5 && el && el.isConnected) {
+      setTimeout(function() { fetchFotoLinksConRetry(segId, el, tentativo + 1); }, 2000);
+    } else if (el && el.isConnected) {
+      el.innerHTML = '';
+    }
+  }
 }
 
 // ── PIN CHIUSURA / PRESA IN CARICO ──
