@@ -3013,20 +3013,18 @@ var _archivioAl       = '';
 var _archivioCodice   = '';
 
 async function openArchivio() {
-  var panel = document.getElementById('archivio-panel');
-  panel.classList.add('open');
+  // Carica i dati in background se non in cache
   if (!_archivioCache) {
-    document.getElementById('archivio-body').innerHTML = '<div class="stats-empty">Caricamento...</div>';
     try {
       var resp = await fetch(FB_BASE + '/storico?pageSize=1000');
       var data = await resp.json();
       _archivioCache = data.documents || [];
     } catch(e) {
-      document.getElementById('archivio-body').innerHTML = '<div class="stats-empty">Errore caricamento archivio</div>';
-      return;
+      console.warn('Errore caricamento archivio:', e);
     }
   }
-  renderArchivio();
+  // Apre direttamente il popup filtri
+  openArchivioFiltri();
 }
 
 function closeArchivio() {
@@ -3068,6 +3066,8 @@ function applicaArchivioFiltri() {
   _archivioPriorita = document.getElementById('ar-priorita').value;
   _archivioCodice   = document.getElementById('ar-codice').value.trim().toUpperCase();
   closeArchivioFiltri();
+  // Apri il pannello lista e mostra i risultati
+  document.getElementById('archivio-panel').classList.add('open');
   aggiornaFiltriAttiviLabel();
   renderArchivio();
 }
