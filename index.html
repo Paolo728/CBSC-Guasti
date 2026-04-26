@@ -575,6 +575,12 @@ textarea{resize:none;min-height:90px;}
   margin-bottom: 10px;
   position: relative;
 }
+@media (min-width:769px) {
+  .intervento-card { padding: 10px 14px; margin-bottom: 8px; }
+  .intervento-tipo { font-size: 13px; margin-bottom: 3px; }
+  .intervento-meta { font-size: 11px; }
+  .intervento-desc { font-size: 11px; }
+}
 .intervento-card.risolto {
   opacity: 0.5;
   border-color: var(--green);
@@ -750,6 +756,18 @@ textarea{resize:none;min-height:90px;}
 }
 .kpi-label { font-size: 11px; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
 
+/* Desktop: KPI su 4 colonne compatte */
+@media (min-width:769px) {
+  .stats-kpi-row {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .kpi-card { padding: 10px 8px; }
+  .kpi-num { font-size: 26px; }
+  .kpi-label { font-size: 10px; }
+}
+
 .stats-section {
   background: var(--dark2);
   border: 1px solid var(--border);
@@ -769,6 +787,59 @@ textarea{resize:none;min-height:90px;}
 .bar-track { flex: 1; height: 20px; background: var(--dark3); border-radius: 4px; overflow: hidden; position: relative; }
 .bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; display: flex; align-items: center; padding-left: 8px; }
 .bar-val { font-size: 11px; font-weight: 600; color: white; }
+
+/* Grafico a barre verticali — tutti i dispositivi */
+.bar-chart {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+  height: 120px;
+  padding: 0 4px;
+}
+.bar-row {
+  flex-direction: column-reverse;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  gap: 4px;
+}
+.bar-label {
+  width: auto;
+  text-align: center;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.bar-track {
+  flex: 1;
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: var(--dark3);
+  border-radius: 4px 4px 0 0;
+  overflow: visible;
+  position: relative;
+}
+.bar-fill {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--bar-h, 0%);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.6s ease;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3px 0 0 0;
+}
+.bar-val {
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
 
 .donut-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
 .donut-card { background: var(--dark2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
@@ -2606,7 +2677,7 @@ function renderStats(docs, allSegs, annoSel) {
     html += '<div class="bar-row">' +
       '<span class="bar-label" style="' + (isCurrentMonth ? 'color:var(--text);font-weight:700' : '') + '">' + m + '</span>' +
       '<div class="bar-track">' +
-      '<div class="bar-fill" style="width:' + (pct || 0) + '%;background:' + color + ';min-width:' + (monthCounts[i]>0?'28px':'0') + '">' +
+      '<div class="bar-fill" style="width:' + (pct || 0) + '%;--bar-h:' + (pct || 0) + '%;background:' + color + ';min-width:' + (monthCounts[i]>0?'28px':'0') + '">' +
       (monthCounts[i] > 0 ? '<span class="bar-val">' + monthCounts[i] + '</span>' : '') +
       '</div></div></div>';
   });
