@@ -959,6 +959,7 @@ textarea{resize:none;min-height:90px;}
       <div class="legend-row"><div class="legend-dot" style="background:#e63946"></div>Aperto</div>
       <div class="legend-row"><div class="legend-dot" style="background:#58a6ff"></div>In carico</div>
       <div class="legend-row"><div class="legend-dot" style="background:#3fb950"></div>Risolto</div>
+
     </div>
 
     <!-- BOTTONE ROSSO PRINCIPALE -->
@@ -1137,22 +1138,15 @@ textarea{resize:none;min-height:90px;}
 <div class="stats-panel" id="archivio-panel">
   <div class="stats-header">
     <h2>🗄️ Archivio interventi</h2>
-    <button class="stats-close" onclick="closeArchivio()">✕</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="openArchivioFiltri()" style="background:rgba(88,166,255,0.1);border:1px solid #58a6ff;color:#58a6ff;padding:5px 12px;border-radius:6px;font-family:Barlow,sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtra
+      </button>
+      <button class="stats-close" onclick="closeArchivio()">✕</button>
+    </div>
   </div>
-  <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 0;border-bottom:1px solid var(--border);padding-bottom:10px">
-    <button id="az-tutti"       onclick="filtroArchivio('tutti','zona')"       style="background:var(--accent);color:var(--dark);border:1px solid var(--accent);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer;font-weight:700">Tutte le zone</button>
-    <button id="az-MVT"         onclick="filtroArchivio('MVT','zona')"         style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">MVT</button>
-    <button id="az-CEDRINO"     onclick="filtroArchivio('CEDRINO','zona')"     style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Cedrino</button>
-    <button id="az-POSADA_NORD" onclick="filtroArchivio('POSADA_NORD','zona')" style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">P.Nord</button>
-    <button id="az-POSADA_SUD"  onclick="filtroArchivio('POSADA_SUD','zona')"  style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">P.Sud</button>
-  </div>
-  <div style="padding:10px 16px 0;border-bottom:1px solid var(--border);padding-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
-    <button id="at-tutti"   onclick="filtroArchivio('tutti','tipo')"   style="background:var(--accent);color:var(--dark);border:1px solid var(--accent);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer;font-weight:700">Tutti i tipi</button>
-    <button id="at-alta"    onclick="filtroArchivio('ALTA','tipo')"    style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Alta priorità</button>
-    <button id="at-media"   onclick="filtroArchivio('MEDIA','tipo')"   style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Media priorità</button>
-    <button id="at-bassa"   onclick="filtroArchivio('BASSA','tipo')"   style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Bassa priorità</button>
-  </div>
-  <div id="archivio-anno-bar" style="padding:10px 16px 0;border-bottom:1px solid var(--border);padding-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"></div>
+  <div id="archivio-filtri-attivi" style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text3);display:none"></div>
   <div class="stats-body" id="archivio-body">
     <div class="stats-empty">Caricamento...</div>
   </div>
@@ -2674,7 +2668,12 @@ async function salvaInStorico(seg) {
     mese:              { integerValue: String(d.getMonth() + 1) },
     giorno:            { integerValue: String(d.getDate()) },
     timestamp_display: { stringValue: seg.timestamp_display || '' },
-    durata_ore:        { doubleValue: durata_ore }
+    durata_ore:        { doubleValue: durata_ore },
+    codice:            { stringValue: seg.codice || '' },
+    descrizione:       { stringValue: seg.descrizione || '' },
+    chiuso_da:         { stringValue: seg.chiuso_da || '' },
+    lat:               { doubleValue: seg.lat || 0 },
+    lng:               { doubleValue: seg.lng || 0 }
   }};
   try {
     await fetch(FB_BASE + '/storico', {
@@ -3006,10 +3005,12 @@ function renderListaInterventi() {
 // ════════════════════════════════════════
 // ARCHIVIO
 // ════════════════════════════════════════
-var _archivioCache   = null;
-var _archivioZona    = 'tutti';
-var _archivioPriorita = 'tutti';
-var _archivioAnno    = 'tutti';
+var _archivioCache    = null;
+var _archivioZona     = '';
+var _archivioPriorita = '';
+var _archivioDal      = '';
+var _archivioAl       = '';
+var _archivioCodice   = '';
 
 async function openArchivio() {
   var panel = document.getElementById('archivio-panel');
@@ -3032,34 +3033,64 @@ function closeArchivio() {
   document.getElementById('archivio-panel').classList.remove('open');
 }
 
-function filtroArchivio(val, tipo) {
-  if (tipo === 'zona')     _archivioZona     = val;
-  if (tipo === 'priorita') _archivioPriorita = val;
-  if (tipo === 'anno')     _archivioAnno     = val;
-  // Aggiorna stile bottoni zona
-  ['tutti','MVT','CEDRINO','POSADA_NORD','POSADA_SUD'].forEach(function(z) {
-    var btn = document.getElementById('az-' + z);
-    if (btn) {
-      var attivo = z === _archivioZona;
-      btn.style.background  = attivo ? 'var(--accent)' : 'var(--dark3)';
-      btn.style.color       = attivo ? 'var(--dark)'   : 'var(--text2)';
-      btn.style.borderColor = attivo ? 'var(--accent)' : 'var(--border)';
-      btn.style.fontWeight  = attivo ? '700' : '400';
-    }
-  });
-  // Aggiorna stile bottoni priorità
-  ['tutti','alta','media','bassa'].forEach(function(p) {
-    var btn = document.getElementById('at-' + p);
-    if (btn) {
-      var valP = p === 'tutti' ? 'tutti' : p.toUpperCase();
-      var attivo = valP === _archivioPriorita;
-      btn.style.background  = attivo ? 'var(--accent)' : 'var(--dark3)';
-      btn.style.color       = attivo ? 'var(--dark)'   : 'var(--text2)';
-      btn.style.borderColor = attivo ? 'var(--accent)' : 'var(--border)';
-      btn.style.fontWeight  = attivo ? '700' : '400';
-    }
-  });
+function openArchivioFiltri() {
+  // Precompila i valori attuali
+  var today = new Date().toISOString().split('T')[0];
+  var yearAgo = new Date(Date.now() - 365*24*60*60*1000).toISOString().split('T')[0];
+  document.getElementById('ar-dal').value      = _archivioDal || yearAgo;
+  document.getElementById('ar-al').value       = _archivioAl  || today;
+  document.getElementById('ar-zona').value     = _archivioZona;
+  document.getElementById('ar-priorita').value = _archivioPriorita;
+  document.getElementById('ar-codice').value    = _archivioCodice;
+  document.getElementById('archivio-modal').style.display = 'flex';
+}
+
+function closeArchivioFiltri() {
+  document.getElementById('archivio-modal').style.display = 'none';
+}
+
+function resetArchivioFiltri() {
+  _archivioZona = ''; _archivioPriorita = ''; _archivioDal = ''; _archivioAl = ''; _archivioCodice = '';
+  document.getElementById('ar-dal').value = '';
+  document.getElementById('ar-al').value = '';
+  document.getElementById('ar-zona').value = '';
+  document.getElementById('ar-priorita').value = '';
+  document.getElementById('ar-codice').value = '';
+  closeArchivioFiltri();
+  aggiornaFiltriAttiviLabel();
   renderArchivio();
+}
+
+function applicaArchivioFiltri() {
+  _archivioDal      = document.getElementById('ar-dal').value;
+  _archivioAl       = document.getElementById('ar-al').value;
+  _archivioZona     = document.getElementById('ar-zona').value;
+  _archivioPriorita = document.getElementById('ar-priorita').value;
+  _archivioCodice   = document.getElementById('ar-codice').value.trim().toUpperCase();
+  closeArchivioFiltri();
+  aggiornaFiltriAttiviLabel();
+  renderArchivio();
+}
+
+function aggiornaFiltriAttiviLabel() {
+  var bar = document.getElementById('archivio-filtri-attivi');
+  if (!bar) return;
+  var parts = [];
+  if (_archivioDal)      parts.push('Dal: ' + _archivioDal);
+  if (_archivioAl)       parts.push('Al: ' + _archivioAl);
+  if (_archivioZona)     parts.push('Zona: ' + (ZONE_LABELS[_archivioZona] || _archivioZona));
+  if (_archivioPriorita) parts.push('Priorità: ' + _archivioPriorita);
+  if (_archivioCodice)   parts.push('Codice: ' + _archivioCodice);
+  if (parts.length > 0) {
+    bar.innerHTML = '🔍 ' + parts.join(' &nbsp;|&nbsp; ');
+    bar.style.display = 'block';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function filtroArchivio(val, tipo) {
+  // Mantenuta per compatibilità ma non più usata dai bottoni
 }
 
 function renderArchivio() {
@@ -3075,14 +3106,32 @@ function renderArchivio() {
       anno:              parseInt(f.anno?.integerValue || '0'),
       giorno:            parseInt(f.giorno?.integerValue || '0'),
       timestamp_display: f.timestamp_display?.stringValue || '',
-      durata_ore:        parseFloat(f.durata_ore?.doubleValue || f.durata_ore?.integerValue || '-1')
+      durata_ore:        parseFloat(f.durata_ore?.doubleValue || f.durata_ore?.integerValue || '-1'),
+      codice:            f.codice?.stringValue || '',
+      chiuso_da:         f.chiuso_da?.stringValue || '',
+      lat:               f.lat?.doubleValue || 0,
+      lng:               f.lng?.doubleValue || 0
     };
   });
 
   // Applica filtri
-  if (_archivioZona !== 'tutti')     records = records.filter(function(r) { return r.zona === _archivioZona; });
-  if (_archivioPriorita !== 'tutti') records = records.filter(function(r) { return r.priorita === _archivioPriorita; });
-  if (_archivioAnno !== 'tutti')     records = records.filter(function(r) { return r.anno === parseInt(_archivioAnno); });
+  if (_archivioZona)     records = records.filter(function(r) { return r.zona === _archivioZona; });
+  if (_archivioPriorita) records = records.filter(function(r) { return r.priorita === _archivioPriorita; });
+  if (_archivioCodice)   records = records.filter(function(r) { return (r.codice || '').toUpperCase().indexOf(_archivioCodice) !== -1; });
+  if (_archivioDal) {
+    var dalTs = new Date(_archivioDal).getTime();
+    records = records.filter(function(r) {
+      var ts = r.timestamp_display ? new Date(r.timestamp_display.split(', ')[0].split('/').reverse().join('-')).getTime() : 0;
+      return ts >= dalTs;
+    });
+  }
+  if (_archivioAl) {
+    var alTs = new Date(_archivioAl).getTime() + 86400000;
+    records = records.filter(function(r) {
+      var ts = r.timestamp_display ? new Date(r.timestamp_display.split(', ')[0].split('/').reverse().join('-')).getTime() : 0;
+      return ts <= alTs;
+    });
+  }
 
   // Ordina per anno/mese/giorno decrescente
   records.sort(function(a, b) {
@@ -3090,24 +3139,6 @@ function renderArchivio() {
     if (b.mese !== a.mese) return b.mese - a.mese;
     return b.giorno - a.giorno;
   });
-
-  // Barra anni dinamica
-  var tuttiAnni = [];
-  (_archivioCache || []).forEach(function(d) {
-    var a = parseInt(d.fields?.anno?.integerValue || '0');
-    if (a && tuttiAnni.indexOf(a) === -1) tuttiAnni.push(a);
-  });
-  tuttiAnni.sort(function(a,b){return b-a;});
-  var annoBar = document.getElementById('archivio-anno-bar');
-  if (annoBar) {
-    var abHtml = '';
-    ['tutti'].concat(tuttiAnni).forEach(function(a) {
-      var att = String(a) === String(_archivioAnno);
-      var label = a === 'tutti' ? 'Tutti gli anni' : String(a);
-      abHtml += '<button onclick="filtroArchivio(\'' + a + '\',\'anno\')" style="background:' + (att ? 'var(--accent)' : 'var(--dark3)') + ';color:' + (att ? 'var(--dark)' : 'var(--text2)') + ';border:1px solid ' + (att ? 'var(--accent)' : 'var(--border)') + ';border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer;font-weight:' + (att ? '700' : '400') + '">' + label + '</button>';
-    });
-    annoBar.innerHTML = abHtml;
-  }
 
   var body = document.getElementById('archivio-body');
   if (records.length === 0) {
@@ -3135,6 +3166,7 @@ function renderArchivio() {
       : '—';
     html += '<div style="padding:12px 16px;border-bottom:1px solid var(--border)">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+        (r.codice ? '<span style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;color:var(--accent)">' + r.codice + '</span>' : '') +
         '<span style="font-size:13px;font-weight:600;color:var(--text)">' + r.tipo + '</span>' +
         '<span style="background:' + pc + ';color:white;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700">' + (r.priorita || '—') + '</span>' +
         '<span style="background:rgba(63,185,80,0.15);color:#3fb950;border:1px solid #3fb950;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700">RISOLTO</span>' +
@@ -3143,12 +3175,123 @@ function renderArchivio() {
         '<span>📍 ' + (r.zona_label || r.zona || '—') + '</span>' +
         '<span>🕐 ' + dataLabel + '</span>' +
         '<span>⏱ ' + durataLabel + '</span>' +
+        (r.chiuso_da ? '<span style="color:#3fb950">✓ ' + r.chiuso_da + '</span>' : '') +
       '</div>' +
     '</div>';
   });
 
   body.innerHTML = html;
 }
+
+// ════════════════════════════════════════
+// MARKER STORICI SULLA MAPPA
+// ════════════════════════════════════════
+var _storiciMarkers = [];
+
+function rimuoviStoriciMappa() {
+  _storiciMarkers.forEach(function(m) { clusterGroup.removeLayer(m); });
+  _storiciMarkers = [];
+}
+
+async function mostraStoriciSuMappa() {
+  // Applica prima i filtri
+  applicaArchivioFiltri();
+  // Chiudi il popup filtri e il pannello archivio
+  closeArchivioFiltri();
+  closeArchivio();
+
+  // Carica storico se non in cache
+  var docs = _archivioCache;
+  if (!docs) {
+    try {
+      var resp = await fetch(FB_BASE + '/storico?pageSize=1000');
+      var data = await resp.json();
+      docs = data.documents || [];
+      _archivioCache = docs;
+    } catch(e) {
+      console.warn('Errore caricamento storici:', e);
+      return;
+    }
+  }
+
+  // Rimuovi marker storici precedenti
+  rimuoviStoriciMappa();
+
+  // Applica gli stessi filtri di renderArchivio
+  var records = docs.map(function(d) {
+    var f = d.fields;
+    var ts = f.timestamp_display?.stringValue || '';
+    return {
+      tipo:              f.tipo?.stringValue || '',
+      priorita:          f.priorita?.stringValue || '',
+      zona:              f.zona?.stringValue || '',
+      zona_label:        f.zona_label?.stringValue || '',
+      codice:            f.codice?.stringValue || '',
+      chiuso_da:         f.chiuso_da?.stringValue || '',
+      timestamp_display: ts,
+      durata_ore:        parseFloat(f.durata_ore?.doubleValue || f.durata_ore?.integerValue || '-1'),
+      lat:               f.lat?.doubleValue || 0,
+      lng:               f.lng?.doubleValue || 0
+    };
+  });
+
+  if (_archivioZona)     records = records.filter(function(r) { return r.zona === _archivioZona; });
+  if (_archivioPriorita) records = records.filter(function(r) { return r.priorita === _archivioPriorita; });
+  if (_archivioCodice)   records = records.filter(function(r) { return (r.codice || '').toUpperCase().indexOf(_archivioCodice) !== -1; });
+  if (_archivioDal) {
+    var dalTs = new Date(_archivioDal).getTime();
+    records = records.filter(function(r) {
+      var ts = r.timestamp_display ? new Date(r.timestamp_display.split(', ')[0].split('/').reverse().join('-')).getTime() : 0;
+      return ts >= dalTs;
+    });
+  }
+  if (_archivioAl) {
+    var alTs = new Date(_archivioAl).getTime() + 86400000;
+    records = records.filter(function(r) {
+      var ts = r.timestamp_display ? new Date(r.timestamp_display.split(', ')[0].split('/').reverse().join('-')).getTime() : 0;
+      return ts <= alTs;
+    });
+  }
+
+  var count = 0;
+  records.forEach(function(r) {
+    if (!r.lat || !r.lng) return;
+    var durataLabel = r.durata_ore >= 0
+      ? (r.durata_ore < 1 ? Math.round(r.durata_ore * 60) + ' min'
+        : r.durata_ore < 24 ? r.durata_ore.toFixed(1) + ' ore'
+        : (r.durata_ore / 24).toFixed(1) + ' gg')
+      : '—';
+
+    var icon = L.divIcon({
+      className: '',
+      html: '<div style="width:16px;height:16px;background:#3fb950;border:2px solid white;border-radius:50%;opacity:0.75;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+      iconSize: [16, 16], iconAnchor: [8, 8]
+    });
+    var marker = L.marker([r.lat, r.lng], { icon: icon });
+    marker.bindPopup(
+      '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px;min-width:180px">' +
+      (r.codice ? '<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:#3fb950;margin-bottom:4px">' + r.codice + '</div>' : '') +
+      '<div style="font-weight:600;margin-bottom:4px">' + r.tipo + '</div>' +
+      '<div style="color:#8b949e;font-size:11px;margin-bottom:2px">📍 ' + (r.zona_label || r.zona) + '</div>' +
+      '<div style="color:#8b949e;font-size:11px;margin-bottom:6px">🕐 ' + r.timestamp_display + '</div>' +
+      '<span style="background:rgba(63,185,80,0.15);color:#3fb950;border:1px solid #3fb950;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700">RISOLTO</span>' +
+      (r.chiuso_da ? '<div style="font-size:11px;color:#3fb950;margin-top:6px">✓ Chiuso da: <strong>' + r.chiuso_da + '</strong></div>' : '') +
+      '<div style="font-size:11px;color:#8b949e;margin-top:4px">⏱ Durata: ' + durataLabel + '</div>' +
+      '</div>'
+    , { maxWidth: 260 });
+    clusterGroup.addLayer(marker);
+    _storiciMarkers.push(marker);
+    count++;
+  });
+
+  if (count > 0) {
+    showToast(count + ' interventi storici mostrati sulla mappa', 'success');
+  } else {
+    showToast('Nessun intervento storico con coordinate per questi filtri', 'error');
+  }
+}
+
+
 
 function stampaListaInterventi() {
   var segs = Object.values(segMarkers).map(function(m) { return m._segData; }).filter(Boolean);
@@ -3680,6 +3823,60 @@ async function getFirebaseToken() {
 </script>
 
 <!-- DOWNLOAD MODAL (desktop only) -->
+<div id="archivio-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;padding:28px;width:460px;max-width:90vw;font-family:Barlow,sans-serif">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="margin:0;font-size:18px;color:#e6edf3">🗄️ Filtra archivio</h2>
+      <button onclick="closeArchivioFiltri()" style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Dal</label>
+        <input type="date" id="ar-dal" style="width:100%;box-sizing:border-box;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Al</label>
+        <input type="date" id="ar-al" style="width:100%;box-sizing:border-box;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Zona</label>
+      <select id="ar-zona" style="width:100%;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+        <option value="">Tutte le zone</option>
+        <option value="MVT">Media Valle del Tirso</option>
+        <option value="CEDRINO">Cedrino</option>
+        <option value="POSADA_NORD">Posada Nord</option>
+        <option value="POSADA_SUD">Posada Sud</option>
+      </select>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Priorità</label>
+      <select id="ar-priorita" style="width:100%;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow,sans-serif;font-size:13px">
+        <option value="">Tutte le priorità</option>
+        <option value="ALTA">Alta</option>
+        <option value="MEDIA">Media</option>
+        <option value="BASSA">Bassa</option>
+      </select>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:4px">Codice / Ordine di lavoro</label>
+      <input type="text" id="ar-codice" placeholder="es. 20260423-1252"
+        style="width:100%;box-sizing:border-box;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:8px 10px;font-family:Barlow Condensed,Barlow,sans-serif;font-size:13px">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:10px">
+      <button onclick="resetArchivioFiltri()" style="flex:1;padding:10px;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#8b949e;font-family:Barlow,sans-serif;font-size:13px;font-weight:600;cursor:pointer">Reset</button>
+      <button onclick="applicaArchivioFiltri()" style="flex:2;padding:10px;background:#58a6ff;border:none;border-radius:8px;color:white;font-family:Barlow,sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Applica filtri
+      </button>
+    </div>
+    <button onclick="mostraStoriciSuMappa()" style="width:100%;padding:10px;background:rgba(63,185,80,0.1);border:1px solid #3fb950;border-radius:8px;color:#3fb950;font-family:Barlow,sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Mostra sulla mappa
+    </button>
+  </div>
+</div>
+
 <div id="download-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center">
   <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;padding:28px;width:460px;max-width:90vw;font-family:Barlow,sans-serif">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
