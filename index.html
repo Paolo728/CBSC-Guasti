@@ -1704,7 +1704,9 @@ function openFormAtPoint(lat, lng) {
     if (nomeComune && nomeComune !== 'null' && comuneEl) comuneEl.textContent = ' · ' + nomeComune;
   }).catch(function(){});
 
-  document.getElementById('form-panel').classList.add('open');
+  var fp = document.getElementById('form-panel');
+  fp.classList.add('open');
+  fp.scrollTop = 0;
   document.getElementById('tap-hint').style.display = 'none';
 
   setTimeout(function() {
