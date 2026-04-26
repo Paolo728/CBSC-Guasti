@@ -1246,7 +1246,8 @@ const ZONE_LABELS = {
 
 // Utenti: { username: { password, ruolo } }
 // ruolo: 'operatore' | 'dirigente'
-const USERS = {
+// Utenti e PIN — caricati da Firestore con fallback locale
+const USERS_FALLBACK = {
   'CBSC':       { password: '84268426', ruolo: 'operatore' },
   'BASILE.E':   { password: 'BE01', ruolo: 'operatore' },
   'CAMBONE.F':  { password: 'CA02', ruolo: 'operatore' },
@@ -1261,14 +1262,55 @@ const USERS = {
   'CRISPONI':   { password: 'CP11', ruolo: 'dirigente' },
   'LAMPIS':     { password: 'IL12', ruolo: 'dirigente' }
 };
+const PIN_FALLBACK = '1708';
 
-// PIN per chiusura guasti (separato dal login)
-const PIN_CHIUSURA = '1708';
+var USERS = Object.assign({}, USERS_FALLBACK);
+var PIN_CHIUSURA = PIN_FALLBACK;
+var PIN_CARICO   = PIN_FALLBACK;
+
+// Carica config da Firestore all'avvio
+async function loadConfigFromFirestore() {
+  try {
+    var r = await fetch(FB_BASE + '/config/impostazioni');
+    if (!r.ok) throw new Error('Config non disponibile');
+    var data = await r.json();
+    var f = data.fields;
+
+    // Carica utenti
+    if (f && f.utenti && f.utenti.mapValue) {
+      var nuoviUtenti = {};
+      var campiUtenti = f.utenti.mapValue.fields;
+      Object.keys(campiUtenti).forEach(function(nome) {
+        var u = campiUtenti[nome].mapValue.fields;
+        nuoviUtenti[nome] = {
+          password: u.password.stringValue,
+          ruolo:    u.ruolo.stringValue
+        };
+      });
+      USERS = nuoviUtenti;
+      console.log('Utenti caricati da Firestore:', Object.keys(USERS).length);
+    }
+
+    // Carica PIN
+    if (f && f.pin && f.pin.mapValue) {
+      var pin = f.pin.mapValue.fields;
+      if (pin.presa_in_carico) PIN_CARICO   = pin.presa_in_carico.stringValue;
+      if (pin.chiusura)        PIN_CHIUSURA = pin.chiusura.stringValue;
+      console.log('PIN caricati da Firestore');
+    }
+
+  } catch(e) {
+    console.warn('Uso configurazione locale (fallback):', e.message);
+    USERS = Object.assign({}, USERS_FALLBACK);
+    PIN_CHIUSURA = PIN_FALLBACK;
+    PIN_CARICO   = PIN_FALLBACK;
+  }
+}
 
 var currentUser = '';
 var currentRuolo = '';
-var pendingCloseId = null;  // id segnalazione da chiudere
-var pendingAction  = 'chiudi'; // 'chiudi' o 'carico'
+var pendingCloseId = null;
+var pendingAction  = 'chiudi';
 
 // ════════════════════════════════════════
 // AUTH
@@ -1282,9 +1324,13 @@ function doLogout() {
   document.getElementById('login-err').style.display = 'none';
 }
 
-function doLogin() {
+async function doLogin() {
   var u = document.getElementById('login-user').value.trim();
   var p = document.getElementById('login-pass').value;
+
+  // Se USERS è ancora quello fallback, riprova a caricare da Firestore
+  if (Object.keys(USERS).length === 0) await loadConfigFromFirestore();
+
   var userData = USERS[u.toUpperCase()] || USERS[u];
   if (userData && userData.password === p) {
     currentUser  = u;
@@ -1301,6 +1347,8 @@ document.addEventListener('keypress', function(e) {
   if (e.key === 'Enter') doLogin();
 });
 
+// Carica config subito all'avvio della pagina
+loadConfigFromFirestore();
 // ════════════════════════════════════════
 // ZONE DATA
 // ════════════════════════════════════════
@@ -1817,7 +1865,8 @@ function closePin() {
 
 function confirmPin() {
   var entered = document.getElementById('pin-input').value.trim();
-  if (entered === PIN_CHIUSURA) {
+  var pinCorretto = (pendingAction === 'carico') ? PIN_CARICO : PIN_CHIUSURA;
+  if (entered === pinCorretto) {
     document.getElementById('pin-modal').classList.remove('show');
     if (pendingAction === 'carico') {
       eseguiPresaInCarico(pendingCloseId);
