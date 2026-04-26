@@ -289,6 +289,16 @@ html,body{height:100%;overflow:hidden;background:var(--dark);color:var(--text);f
   70%{box-shadow:0 0 0 8px rgba(230,57,70,0);}
   100%{box-shadow:0 0 0 0 rgba(230,57,70,0);}
 }
+@keyframes cluster-pulse-red{
+  0%{box-shadow:inset 0 0 0 4px #e63946, 0 0 0 0 rgba(230,57,70,0.5);}
+  70%{box-shadow:inset 0 0 0 4px #e63946, 0 0 0 10px rgba(230,57,70,0);}
+  100%{box-shadow:inset 0 0 0 4px #e63946, 0 0 0 0 rgba(230,57,70,0);}
+}
+@keyframes cluster-pulse-orange{
+  0%{box-shadow:inset 0 0 0 4px #f0883e, 0 0 0 0 rgba(240,136,62,0.5);}
+  70%{box-shadow:inset 0 0 0 4px #f0883e, 0 0 0 10px rgba(240,136,62,0);}
+  100%{box-shadow:inset 0 0 0 4px #f0883e, 0 0 0 0 rgba(240,136,62,0);}
+}
 .form-zona{
   display:inline-flex;align-items:center;gap:6px;
   margin-top:6px;font-size:13px;color:var(--text2);
@@ -1570,11 +1580,26 @@ function initApp() {
       }
       var count = cluster.getChildCount();
       var size = count >= 10 ? 46 : 38;
+      // Box-shadow interna (bordo verso interno) + pulsazione se aperti
+      var shadowStyle, animStyle;
+      if (hasAperto && hasAlta) {
+        shadowStyle = 'inset 0 0 0 4px #e63946, 0 2px 8px rgba(0,0,0,0.4)';
+        animStyle   = 'cluster-pulse-red 1.6s ease-in-out infinite';
+      } else if (hasAperto) {
+        shadowStyle = 'inset 0 0 0 4px #f0883e, 0 2px 8px rgba(0,0,0,0.4)';
+        animStyle   = 'cluster-pulse-orange 1.8s ease-in-out infinite';
+      } else if (hasInCarico) {
+        shadowStyle = 'inset 0 0 0 4px #58a6ff, 0 2px 8px rgba(0,0,0,0.4)';
+        animStyle   = 'none';
+      } else {
+        shadowStyle = 'inset 0 0 0 4px #3fb950, 0 2px 8px rgba(0,0,0,0.4)';
+        animStyle   = 'none';
+      }
       return L.divIcon({
         html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;' +
           'background:white;' +
-          'border:3px solid ' + borderColor + ';' +
-          'box-shadow:0 2px 8px rgba(0,0,0,0.5);' +
+          'box-shadow:' + shadowStyle + ';' +
+          'animation:' + animStyle + ';' +
           'display:flex;align-items:center;justify-content:center;' +
           'font-family:Barlow Condensed,sans-serif;font-size:' + (count >= 10 ? 16 : 15) + 'px;' +
           'font-weight:700;color:#1a1a2e">' + count + '</div>',
