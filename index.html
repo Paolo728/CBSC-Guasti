@@ -2343,31 +2343,40 @@ function closeStats() {
   document.getElementById('stats-panel').classList.remove('open');
 }
 
+// Cache dati stats (caricati una volta sola)
+var _statsCache = { docs: null, allSegs: null };
+var _annoSelezionato = new Date().getFullYear();
+
 async function loadStats() {
   try {
     var resp  = await fetch(FB_BASE + '/storico?pageSize=1000');
     var data  = await resp.json();
-    var docs  = data.documents || [];
+    _statsCache.docs = data.documents || [];
     var respA = await fetch(FB_BASE + '/segnalazioni?pageSize=1000');
     var dataA = await respA.json();
-    var allSegs = dataA.documents || [];
-    // Conta solo i marker visibili sulla mappa (rispetta il filtro 7 giorni)
-    var activeCount = 0;
-    Object.values(segMarkers).forEach(function(m) {
-      if (m._segData && (m._segData.stato === 'APERTO' || m._segData.stato === 'PRESO_IN_CARICO')) {
-        activeCount++;
-      }
-    });
-    renderStats(docs, activeCount, allSegs);
+    _statsCache.allSegs = dataA.documents || [];
+    _annoSelezionato = new Date().getFullYear();
+    renderStats(_statsCache.docs, _statsCache.allSegs, _annoSelezionato);
   } catch(e) {
     document.getElementById('stats-body').innerHTML = '<div class="stats-empty">Errore caricamento statistiche</div>';
   }
 }
 
-function renderStats(docs, activeCount, allSegs) {
-  var now = new Date(), thisYear = now.getFullYear(), thisMonth = now.getMonth();
+function cambiaAnnoStats(anno) {
+  _annoSelezionato = parseInt(anno);
+  if (_statsCache.docs && _statsCache.allSegs) {
+    renderStats(_statsCache.docs, _statsCache.allSegs, _annoSelezionato);
+  }
+}
 
-  // Records storico (per grafici e tempo medio)
+function renderStats(docs, allSegs, annoSel) {
+  var now = new Date();
+  var thisYear  = now.getFullYear();
+  var thisMonth = now.getMonth();
+  if (!annoSel) annoSel = thisYear;
+  var isCurrentYear = annoSel === thisYear;
+
+  // Records storico (per tempo medio risoluzione)
   var records = docs.map(function(d) {
     var f = d.fields;
     return {
@@ -2381,37 +2390,55 @@ function renderStats(docs, activeCount, allSegs) {
     };
   });
 
-  // Tutte le segnalazioni (per KPI corretti)
+  // Tutte le segnalazioni — include anche TTL scaduto (sono dati storici validi)
   var tutteSegs = (allSegs || []).map(function(d) {
     var f = d.fields;
     var ts = f.timestamp?.stringValue || '';
     var d2 = ts ? new Date(ts) : null;
-    var ttl = parseInt(f.ttl?.integerValue || '0');
-    // Escludi segnalazioni con TTL scaduto (non visibili sulla mappa)
-    if (ttl && Date.now() > ttl) return null;
     return {
       tipo:     f.tipo?.stringValue || '',
       zona:     f.zona?.stringValue || '',
       stato:    f.stato?.stringValue || 'APERTO',
       anno:     d2 ? d2.getFullYear() : 0,
-      mese:     d2 ? d2.getMonth() + 1 : 0
+      mese:     d2 ? d2.getMonth() + 1 : 0,
+      ttl:      parseInt(f.ttl?.integerValue || '0')
     };
-  }).filter(function(r) { return r !== null; });
+  }).filter(function(r) { return r.anno > 0; });
 
-  var yearSegs  = tutteSegs.filter(function(r) { return r.anno === thisYear; });
-  var monthSegs = tutteSegs.filter(function(r) { return r.anno === thisYear && r.mese === thisMonth + 1; });
-  var totAnno   = yearSegs.length;
-  var totMese   = monthSegs.length;
-  // Risolte = quelle con stato RISOLTO in segnalazioni (rimangono su Firebase anche dopo 7gg)
-  var risolte   = tutteSegs.filter(function(r) { return r.stato === 'RISOLTO'; }).length;
+  // Ricava anni disponibili per il selettore
+  var anniDisponibili = [];
+  tutteSegs.forEach(function(r) {
+    if (r.anno && anniDisponibili.indexOf(r.anno) === -1) anniDisponibili.push(r.anno);
+  });
+  records.forEach(function(r) {
+    if (r.anno && anniDisponibili.indexOf(r.anno) === -1) anniDisponibili.push(r.anno);
+  });
+  anniDisponibili.sort(function(a,b){return b-a;});
+
+  // Segnalazioni dell'anno selezionato
+  var segsAnno  = tutteSegs.filter(function(r) { return r.anno === annoSel; });
+  // Mese corrente nell'anno selezionato
+  var segsMese  = segsAnno.filter(function(r) { return r.mese === thisMonth + 1; });
+
+  var totAnno = segsAnno.length;
+  var totMese = isCurrentYear ? segsMese.length : 0;
+  var risolte = segsAnno.filter(function(r) { return r.stato === 'RISOLTO'; }).length;
+
+  // Aperte ora — sempre live dalla mappa (solo anno corrente)
+  var activeCount = 0;
+  Object.values(segMarkers).forEach(function(m) {
+    if (m._segData && (m._segData.stato === 'APERTO' || m._segData.stato === 'PRESO_IN_CARICO')) {
+      activeCount++;
+    }
+  });
 
   var months = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
   var monthCounts = Array(12).fill(0);
-  yearSegs.forEach(function(r) { if (r.mese >= 1 && r.mese <= 12) monthCounts[r.mese-1]++; });
+  segsAnno.forEach(function(r) { if (r.mese >= 1 && r.mese <= 12) monthCounts[r.mese-1]++; });
   var maxMonth = Math.max.apply(null, monthCounts.concat([1]));
 
   var zoneCounts = {}, tipoCounts = {};
-  tutteSegs.forEach(function(r) {
+  segsAnno.forEach(function(r) {
     if (r.zona) zoneCounts[r.zona] = (zoneCounts[r.zona]||0)+1;
     if (r.tipo) tipoCounts[r.tipo] = (tipoCounts[r.tipo]||0)+1;
   });
@@ -2430,12 +2457,23 @@ function renderStats(docs, activeCount, allSegs) {
     html += '<div class="ttl-info">📋 <strong>Google Sheets non configurato.</strong> Imposta il webhook nel file index.html per abilitare l\'export automatico.</div>';
   }
 
+  // Selettore anno (solo se ci sono più anni)
+  if (anniDisponibili.length > 1) {
+    html += '<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:12px">';
+    html += '<span style="font-size:12px;color:var(--text3)">Anno:</span>';
+    html += '<select onchange="cambiaAnnoStats(this.value)" style="background:var(--dark3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:13px;font-family:Barlow,sans-serif;cursor:pointer">';
+    anniDisponibili.forEach(function(a) {
+      html += '<option value="' + a + '"' + (a === annoSel ? ' selected' : '') + '>' + a + '</option>';
+    });
+    html += '</select></div>';
+  }
+
   // KPIs
   html += '<div class="stats-kpi-row">';
-  html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--red)">'    + activeCount + '</div><div class="kpi-label">Aperte ora</div></div>';
-  html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--yellow)">' + totMese     + '</div><div class="kpi-label">Questo mese</div></div>';
-  html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--accent)">' + totAnno     + '</div><div class="kpi-label">Anno ' + thisYear + '</div></div>';
-  html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--green)">'  + risolte     + '</div><div class="kpi-label">Risolte totali</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--red)">'    + (isCurrentYear ? activeCount : '—') + '</div><div class="kpi-label">Aperte ora</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--yellow)">' + (isCurrentYear ? totMese : '—')     + '</div><div class="kpi-label">Questo mese</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--accent)">' + totAnno                             + '</div><div class="kpi-label">Anno ' + annoSel + '</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-num" style="color:var(--green)">'  + risolte                             + '</div><div class="kpi-label">Risolte ' + annoSel + '</div></div>';
   html += '</div>';
 
   if (tutteSegs.length === 0 && records.length === 0) {
@@ -2444,18 +2482,18 @@ function renderStats(docs, activeCount, allSegs) {
     return;
   }
 
-  // Colori sfumati per mese (stessa tonalità blu-verde con variazioni)
+  // Colori sfumati per mese
   var monthColors = [
-    '#1a6b8a','#1e7d9e','#2290b3','#26a2c7', // Gen-Apr (blu freddo)
-    '#2ab5db','#2ec8ef','#32dafa','#53e2fb',  // Mag-Ago (azzurro)
-    '#74eafc','#95f2fd','#b6f9fe','#d7ffff'  // Set-Dic (azzurro chiaro)
+    '#1a6b8a','#1e7d9e','#2290b3','#26a2c7',
+    '#2ab5db','#2ec8ef','#32dafa','#53e2fb',
+    '#74eafc','#95f2fd','#b6f9fe','#d7ffff'
   ];
 
-  html += '<div class="stats-section"><h3>Segnalazioni per mese — ' + thisYear + '</h3><div class="bar-chart">';
+  html += '<div class="stats-section"><h3>Segnalazioni per mese — ' + annoSel + '</h3><div class="bar-chart">';
   months.forEach(function(m, i) {
     var pct   = Math.round(monthCounts[i] / maxMonth * 100);
-    var color = i === thisMonth ? '#e63946' : monthColors[i];
-    var isCurrentMonth = i === thisMonth;
+    var isCurrentMonth = isCurrentYear && i === thisMonth;
+    var color = isCurrentMonth ? '#e63946' : monthColors[i];
     html += '<div class="bar-row">' +
       '<span class="bar-label" style="' + (isCurrentMonth ? 'color:var(--text);font-weight:700' : '') + '">' + m + '</span>' +
       '<div class="bar-track">' +
@@ -2472,20 +2510,14 @@ function renderStats(docs, activeCount, allSegs) {
   html += '<div class="donut-card"><h3>Per tipo</h3>' + buildDonut(tipoCounts, tipoColMap, tipoKeys, totalTipo, null) + '</div>';
   html += '</div>';
 
-  // Tempo medio per tipologia - sempre visibile
+  // Tempo medio per tipologia — filtrato per anno selezionato
   var tipoTempi = {};
-  // Dallo storico (ha durata_ore)
-  records.forEach(function(r) {
+  records.filter(function(r) { return r.anno === annoSel; }).forEach(function(r) {
     if (r.tipo && r.durata_ore >= 0) {
       if (!tipoTempi[r.tipo]) tipoTempi[r.tipo] = { somma: 0, count: 0 };
       tipoTempi[r.tipo].somma += r.durata_ore;
       tipoTempi[r.tipo].count += 1;
     }
-  });
-  // Aggiungi tipi dalle segnalazioni risolte senza durata (conteggio 0)
-  tutteSegs.filter(function(r) { return r.stato === 'RISOLTO' && r.tipo; }).forEach(function(r) {
-    if (!tipoTempi[r.tipo]) tipoTempi[r.tipo] = { somma: 0, count: 0 };
-    // Non aggiungere alla somma se già nello storico (evita duplicati)
   });
   var tipiConTempi = Object.keys(tipoTempi);
   html += '<div class="stats-section"><h3>⏱ Tempo medio risoluzione</h3>';
