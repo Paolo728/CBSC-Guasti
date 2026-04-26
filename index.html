@@ -936,6 +936,9 @@ textarea{resize:none;min-height:90px;}
       <button class="stats-btn" id="btn-layer" onclick="toggleRetePanel(); event.stopPropagation();">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>Layer
       </button>
+      <button class="stats-btn desktop-only" onclick="openArchivio()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 8v13H3V8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archivio
+      </button>
       <button class="stats-btn desktop-only" onclick="openDownload()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download
       </button>
@@ -1118,7 +1121,39 @@ textarea{resize:none;min-height:90px;}
     <h2>📊 Statistiche guasti</h2>
     <button class="stats-close" onclick="closeStats()">✕</button>
   </div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 0;border-bottom:1px solid var(--border);padding-bottom:10px">
+    <button id="sz-tutti"       onclick="cambiaZonaStats('tutti')"       style="background:var(--accent);color:var(--dark);border:1px solid var(--accent);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer;font-weight:700">Tutte le zone</button>
+    <button id="sz-MVT"         onclick="cambiaZonaStats('MVT')"         style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">MVT</button>
+    <button id="sz-CEDRINO"     onclick="cambiaZonaStats('CEDRINO')"     style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Cedrino</button>
+    <button id="sz-POSADA_NORD" onclick="cambiaZonaStats('POSADA_NORD')" style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">P.Nord</button>
+    <button id="sz-POSADA_SUD"  onclick="cambiaZonaStats('POSADA_SUD')"  style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">P.Sud</button>
+  </div>
   <div class="stats-body" id="stats-body">
+    <div class="stats-empty">Caricamento...</div>
+  </div>
+</div>
+
+<!-- ARCHIVIO PANEL -->
+<div class="stats-panel" id="archivio-panel">
+  <div class="stats-header">
+    <h2>🗄️ Archivio interventi</h2>
+    <button class="stats-close" onclick="closeArchivio()">✕</button>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 0;border-bottom:1px solid var(--border);padding-bottom:10px">
+    <button id="az-tutti"       onclick="filtroArchivio('tutti','zona')"       style="background:var(--accent);color:var(--dark);border:1px solid var(--accent);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer;font-weight:700">Tutte le zone</button>
+    <button id="az-MVT"         onclick="filtroArchivio('MVT','zona')"         style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">MVT</button>
+    <button id="az-CEDRINO"     onclick="filtroArchivio('CEDRINO','zona')"     style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Cedrino</button>
+    <button id="az-POSADA_NORD" onclick="filtroArchivio('POSADA_NORD','zona')" style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">P.Nord</button>
+    <button id="az-POSADA_SUD"  onclick="filtroArchivio('POSADA_SUD','zona')"  style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">P.Sud</button>
+  </div>
+  <div style="padding:10px 16px 0;border-bottom:1px solid var(--border);padding-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
+    <button id="at-tutti"   onclick="filtroArchivio('tutti','tipo')"   style="background:var(--accent);color:var(--dark);border:1px solid var(--accent);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer;font-weight:700">Tutti i tipi</button>
+    <button id="at-alta"    onclick="filtroArchivio('ALTA','tipo')"    style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Alta priorità</button>
+    <button id="at-media"   onclick="filtroArchivio('MEDIA','tipo')"   style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Media priorità</button>
+    <button id="at-bassa"   onclick="filtroArchivio('BASSA','tipo')"   style="background:var(--dark3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer">Bassa priorità</button>
+  </div>
+  <div id="archivio-anno-bar" style="padding:10px 16px 0;border-bottom:1px solid var(--border);padding-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"></div>
+  <div class="stats-body" id="archivio-body">
     <div class="stats-empty">Caricamento...</div>
   </div>
 </div>
@@ -1487,6 +1522,7 @@ function initApp() {
   loadSegnalazioni();
   initReteIdrica();
   keepSupabaseAlive();
+  avviaPollingNuoveSegnalazioni();
 
   // GPS automatico all'avvio
   if (navigator.geolocation) {
@@ -2352,6 +2388,7 @@ function closeStats() {
 // Cache dati stats (caricati una volta sola)
 var _statsCache = { docs: null, allSegs: null };
 var _annoSelezionato = new Date().getFullYear();
+var _statsZona = 'tutti';
 
 async function loadStats() {
   try {
@@ -2370,6 +2407,23 @@ async function loadStats() {
 
 function cambiaAnnoStats(anno) {
   _annoSelezionato = parseInt(anno);
+  if (_statsCache.docs && _statsCache.allSegs) {
+    renderStats(_statsCache.docs, _statsCache.allSegs, _annoSelezionato);
+  }
+}
+
+function cambiaZonaStats(zona) {
+  _statsZona = zona;
+  // Aggiorna stile bottoni
+  ['tutti','MVT','CEDRINO','POSADA_NORD','POSADA_SUD'].forEach(function(z) {
+    var btn = document.getElementById('sz-' + z);
+    if (btn) {
+      btn.style.background = z === zona ? 'var(--accent)' : 'var(--dark3)';
+      btn.style.color      = z === zona ? 'var(--dark)'  : 'var(--text2)';
+      btn.style.borderColor= z === zona ? 'var(--accent)' : 'var(--border)';
+      btn.style.fontWeight = z === zona ? '700' : '400';
+    }
+  });
   if (_statsCache.docs && _statsCache.allSegs) {
     renderStats(_statsCache.docs, _statsCache.allSegs, _annoSelezionato);
   }
@@ -2421,8 +2475,14 @@ function renderStats(docs, allSegs, annoSel) {
   });
   anniDisponibili.sort(function(a,b){return b-a;});
 
+  // Applica filtro zona se selezionato
+  var tutteSegsFiltrate = _statsZona === 'tutti' ? tutteSegs
+    : tutteSegs.filter(function(r) { return r.zona === _statsZona; });
+  var recordsFiltrati = _statsZona === 'tutti' ? records
+    : records.filter(function(r) { return r.zona === _statsZona; });
+
   // Segnalazioni dell'anno selezionato
-  var segsAnno  = tutteSegs.filter(function(r) { return r.anno === annoSel; });
+  var segsAnno  = tutteSegsFiltrate.filter(function(r) { return r.anno === annoSel; });
   // Mese corrente nell'anno selezionato
   var segsMese  = segsAnno.filter(function(r) { return r.mese === thisMonth + 1; });
 
@@ -2516,9 +2576,9 @@ function renderStats(docs, allSegs, annoSel) {
   html += '<div class="donut-card"><h3>Per tipo</h3>' + buildDonut(tipoCounts, tipoColMap, tipoKeys, totalTipo, null) + '</div>';
   html += '</div>';
 
-  // Tempo medio per tipologia — filtrato per anno selezionato
+  // Tempo medio per tipologia — filtrato per anno selezionato e zona
   var tipoTempi = {};
-  records.filter(function(r) { return r.anno === annoSel; }).forEach(function(r) {
+  recordsFiltrati.filter(function(r) { return r.anno === annoSel; }).forEach(function(r) {
     if (r.tipo && r.durata_ore >= 0) {
       if (!tipoTempi[r.tipo]) tipoTempi[r.tipo] = { somma: 0, count: 0 };
       tipoTempi[r.tipo].somma += r.durata_ore;
@@ -2941,6 +3001,153 @@ function renderListaInterventi() {
     '</div>';
   });
   list.innerHTML = html;
+}
+
+// ════════════════════════════════════════
+// ARCHIVIO
+// ════════════════════════════════════════
+var _archivioCache   = null;
+var _archivioZona    = 'tutti';
+var _archivioPriorita = 'tutti';
+var _archivioAnno    = 'tutti';
+
+async function openArchivio() {
+  var panel = document.getElementById('archivio-panel');
+  panel.classList.add('open');
+  if (!_archivioCache) {
+    document.getElementById('archivio-body').innerHTML = '<div class="stats-empty">Caricamento...</div>';
+    try {
+      var resp = await fetch(FB_BASE + '/storico?pageSize=1000');
+      var data = await resp.json();
+      _archivioCache = data.documents || [];
+    } catch(e) {
+      document.getElementById('archivio-body').innerHTML = '<div class="stats-empty">Errore caricamento archivio</div>';
+      return;
+    }
+  }
+  renderArchivio();
+}
+
+function closeArchivio() {
+  document.getElementById('archivio-panel').classList.remove('open');
+}
+
+function filtroArchivio(val, tipo) {
+  if (tipo === 'zona')     _archivioZona     = val;
+  if (tipo === 'priorita') _archivioPriorita = val;
+  if (tipo === 'anno')     _archivioAnno     = val;
+  // Aggiorna stile bottoni zona
+  ['tutti','MVT','CEDRINO','POSADA_NORD','POSADA_SUD'].forEach(function(z) {
+    var btn = document.getElementById('az-' + z);
+    if (btn) {
+      var attivo = z === _archivioZona;
+      btn.style.background  = attivo ? 'var(--accent)' : 'var(--dark3)';
+      btn.style.color       = attivo ? 'var(--dark)'   : 'var(--text2)';
+      btn.style.borderColor = attivo ? 'var(--accent)' : 'var(--border)';
+      btn.style.fontWeight  = attivo ? '700' : '400';
+    }
+  });
+  // Aggiorna stile bottoni priorità
+  ['tutti','alta','media','bassa'].forEach(function(p) {
+    var btn = document.getElementById('at-' + p);
+    if (btn) {
+      var valP = p === 'tutti' ? 'tutti' : p.toUpperCase();
+      var attivo = valP === _archivioPriorita;
+      btn.style.background  = attivo ? 'var(--accent)' : 'var(--dark3)';
+      btn.style.color       = attivo ? 'var(--dark)'   : 'var(--text2)';
+      btn.style.borderColor = attivo ? 'var(--accent)' : 'var(--border)';
+      btn.style.fontWeight  = attivo ? '700' : '400';
+    }
+  });
+  renderArchivio();
+}
+
+function renderArchivio() {
+  var docs = _archivioCache || [];
+  var records = docs.map(function(d) {
+    var f = d.fields;
+    return {
+      tipo:              f.tipo?.stringValue || '',
+      priorita:          f.priorita?.stringValue || '',
+      zona:              f.zona?.stringValue || '',
+      zona_label:        f.zona_label?.stringValue || '',
+      mese:              parseInt(f.mese?.integerValue || '0'),
+      anno:              parseInt(f.anno?.integerValue || '0'),
+      giorno:            parseInt(f.giorno?.integerValue || '0'),
+      timestamp_display: f.timestamp_display?.stringValue || '',
+      durata_ore:        parseFloat(f.durata_ore?.doubleValue || f.durata_ore?.integerValue || '-1')
+    };
+  });
+
+  // Applica filtri
+  if (_archivioZona !== 'tutti')     records = records.filter(function(r) { return r.zona === _archivioZona; });
+  if (_archivioPriorita !== 'tutti') records = records.filter(function(r) { return r.priorita === _archivioPriorita; });
+  if (_archivioAnno !== 'tutti')     records = records.filter(function(r) { return r.anno === parseInt(_archivioAnno); });
+
+  // Ordina per anno/mese/giorno decrescente
+  records.sort(function(a, b) {
+    if (b.anno !== a.anno) return b.anno - a.anno;
+    if (b.mese !== a.mese) return b.mese - a.mese;
+    return b.giorno - a.giorno;
+  });
+
+  // Barra anni dinamica
+  var tuttiAnni = [];
+  (_archivioCache || []).forEach(function(d) {
+    var a = parseInt(d.fields?.anno?.integerValue || '0');
+    if (a && tuttiAnni.indexOf(a) === -1) tuttiAnni.push(a);
+  });
+  tuttiAnni.sort(function(a,b){return b-a;});
+  var annoBar = document.getElementById('archivio-anno-bar');
+  if (annoBar) {
+    var abHtml = '';
+    ['tutti'].concat(tuttiAnni).forEach(function(a) {
+      var att = String(a) === String(_archivioAnno);
+      var label = a === 'tutti' ? 'Tutti gli anni' : String(a);
+      abHtml += '<button onclick="filtroArchivio(\'' + a + '\',\'anno\')" style="background:' + (att ? 'var(--accent)' : 'var(--dark3)') + ';color:' + (att ? 'var(--dark)' : 'var(--text2)') + ';border:1px solid ' + (att ? 'var(--accent)' : 'var(--border)') + ';border-radius:6px;padding:4px 12px;font-size:11px;font-family:Barlow,sans-serif;cursor:pointer;font-weight:' + (att ? '700' : '400') + '">' + label + '</button>';
+    });
+    annoBar.innerHTML = abHtml;
+  }
+
+  var body = document.getElementById('archivio-body');
+  if (records.length === 0) {
+    body.innerHTML = '<div class="stats-empty">Nessun intervento nell\'archivio con questi filtri</div>';
+    return;
+  }
+
+  var prioColori = { 'ALTA':'#e63946', 'MEDIA':'#f0883e', 'BASSA':'#d29922' };
+  var months = ['','Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+
+  var html = '<div style="padding:12px 16px;font-size:12px;color:var(--text3)">' + records.length + ' interventi archiviati</div>';
+  var annoCorrente = null;
+  records.forEach(function(r) {
+    if (r.anno !== annoCorrente) {
+      annoCorrente = r.anno;
+      html += '<div style="padding:8px 16px;background:var(--dark3);font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">' + r.anno + '</div>';
+    }
+    var pc = prioColori[r.priorita] || '#888';
+    var dataLabel = r.giorno + ' ' + (months[r.mese] || '') + ' ' + r.anno;
+    if (r.timestamp_display) dataLabel = r.timestamp_display;
+    var durataLabel = r.durata_ore >= 0
+      ? (r.durata_ore < 1 ? Math.round(r.durata_ore * 60) + ' min'
+        : r.durata_ore < 24 ? r.durata_ore.toFixed(1) + ' ore'
+        : (r.durata_ore / 24).toFixed(1) + ' gg')
+      : '—';
+    html += '<div style="padding:12px 16px;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+        '<span style="font-size:13px;font-weight:600;color:var(--text)">' + r.tipo + '</span>' +
+        '<span style="background:' + pc + ';color:white;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700">' + (r.priorita || '—') + '</span>' +
+        '<span style="background:rgba(63,185,80,0.15);color:#3fb950;border:1px solid #3fb950;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700">RISOLTO</span>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap">' +
+        '<span>📍 ' + (r.zona_label || r.zona || '—') + '</span>' +
+        '<span>🕐 ' + dataLabel + '</span>' +
+        '<span>⏱ ' + durataLabel + '</span>' +
+      '</div>' +
+    '</div>';
+  });
+
+  body.innerHTML = html;
 }
 
 function stampaListaInterventi() {
