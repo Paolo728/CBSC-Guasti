@@ -2117,12 +2117,38 @@ async function sendToSheets(seg) {
     elemento_comizio:  seg.elemento_comizio || '',
     _action:      seg._action || 'insert'
   };
-  console.log('sendToSheets payload zona_key:', payload.zona_key, 'zona:', payload.zona);
-  await fetch(SHEETS_WEBHOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(payload)
-  });
+
+  try {
+    var resp = await fetch(SHEETS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+
+    // Se Apps Script ha salvato foto su Drive, il client scrive i link su Firebase direttamente
+    if (resp.ok && seg.id && seg._action !== 'update') {
+      try {
+        var result = await resp.json();
+        if (result.foto_links && result.foto_links.length > 0) {
+          var linksStr = result.foto_links.join(' | ');
+          var fbUrl = FB_BASE + '/segnalazioni/' + seg.id + '?updateMask.fieldPaths=foto_links';
+          await fetch(fbUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: { foto_links: { stringValue: linksStr } } })
+          });
+          // Aggiorna cache locale e marker
+          if (window._segCache && window._segCache[seg.id]) window._segCache[seg.id].foto_links = linksStr;
+          if (segMarkers[seg.id]) segMarkers[seg.id]._segData.foto_links = linksStr;
+          console.log('foto_links scritti su Firebase dal client:', linksStr);
+        }
+      } catch(je) {
+        console.warn('Risposta Sheets non JSON o foto_links assenti:', je);
+      }
+    }
+  } catch(e) {
+    console.warn('Sheets webhook error:', e);
+  }
 }
 
 // ── TELEGRAM (gestito dall'app direttamente) ──
