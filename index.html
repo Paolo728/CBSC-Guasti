@@ -830,15 +830,15 @@ textarea{resize:none;min-height:90px;}
   border-radius: 4px 4px 0 0;
   transition: height 0.6s ease;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 3px 0 0 0;
+  padding: 0;
 }
 .bar-val {
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 700;
   color: white;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
 }
 
 .donut-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
@@ -2662,11 +2662,20 @@ function renderStats(docs, allSegs, annoSel) {
     return;
   }
 
-  // Colori sfumati per mese
+  // Colori diversi per ogni mese
   var monthColors = [
-    '#1a6b8a','#1e7d9e','#2290b3','#26a2c7',
-    '#2ab5db','#2ec8ef','#32dafa','#53e2fb',
-    '#74eafc','#95f2fd','#b6f9fe','#d7ffff'
+    '#4361ee', // Gen — blu elettrico
+    '#3a86ff', // Feb — azzurro
+    '#48cae4', // Mar — celeste
+    '#2ec8ef', // Apr — usato solo se non è mese corrente
+    '#06d6a0', // Mag — verde acqua
+    '#52b788', // Giu — verde
+    '#f9c74f', // Lug — giallo dorato
+    '#f8961e', // Ago — arancione
+    '#f3722c', // Set — arancione scuro
+    '#a371f7', // Ott — viola
+    '#c77dff', // Nov — lilla
+    '#7b2d8b'  // Dic — viola scuro
   ];
 
   html += '<div class="stats-section"><h3>Segnalazioni per mese — ' + annoSel + '</h3><div class="bar-chart">';
