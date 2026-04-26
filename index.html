@@ -2504,8 +2504,8 @@ function renderStats(docs, allSegs, annoSel) {
     if (r.zona) zoneCounts[r.zona] = (zoneCounts[r.zona]||0)+1;
     if (r.tipo) tipoCounts[r.tipo] = (tipoCounts[r.tipo]||0)+1;
   });
-  var totalZone = Object.values(zoneCounts).reduce(function(a,b){return a+b;},0) || 1;
-  var totalTipo = Object.values(tipoCounts).reduce(function(a,b){return a+b;},0) || 1;
+  var totalZone = Object.values(zoneCounts).reduce(function(a,b){return a+b;},0);
+  var totalTipo = Object.values(tipoCounts).reduce(function(a,b){return a+b;},0);
 
   var zoneColors  = {'MVT':'#e63946','CEDRINO':'#f77f00','POSADA_NORD':'#2d6a4f','POSADA_SUD':'#457b9d'};
   var tipoColors  = ['#e63946','#f0883e','#d29922','#3fb950','#58a6ff','#a371f7'];
@@ -2610,6 +2610,12 @@ function renderStats(docs, allSegs, annoSel) {
 }
 
 function buildDonut(counts, colors, keys, total, labels) {
+  if (total === 0) {
+    return '<div class="donut-wrap"><svg viewBox="0 0 100 100">' +
+      '<circle cx="50" cy="50" r="38" fill="none" stroke="var(--dark3)" stroke-width="12"/>' +
+      '</svg><div class="donut-center"><span class="donut-num">0</span><span class="donut-sub">totali</span></div></div>' +
+      '<div class="legend-list"><div style="font-size:11px;color:var(--text3);text-align:center;padding:8px">Nessun dato</div></div>';
+  }
   var r = 38, cx = 50, cy = 50, circumference = 2 * Math.PI * r;
   var html = '<div class="donut-wrap"><svg viewBox="0 0 100 100">';
   html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="var(--dark3)" stroke-width="12"/>';
