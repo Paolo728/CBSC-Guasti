@@ -1516,7 +1516,6 @@ function initApp() {
   loadSegnalazioni();
   initReteIdrica();
   keepSupabaseAlive();
-  avviaPollingNuoveSegnalazioni();
 
   // GPS automatico all'avvio
   if (navigator.geolocation) {
@@ -2477,7 +2476,6 @@ function renderStats(docs, allSegs, annoSel) {
 
   // Segnalazioni dell'anno selezionato
   var segsAnno  = tutteSegsFiltrate.filter(function(r) { return r.anno === annoSel; });
-  console.log('DEBUG zona:', _statsZona, 'tutteSegs:', tutteSegs.length, 'filtrate:', tutteSegsFiltrate.length, 'segsAnno:', segsAnno.length, 'zone:', tutteSegsFiltrate.map(function(r){return r.zona;}));
   // Mese corrente nell'anno selezionato
   var segsMese  = segsAnno.filter(function(r) { return r.mese === thisMonth + 1; });
 
@@ -2489,7 +2487,7 @@ function renderStats(docs, allSegs, annoSel) {
   var activeCount = 0;
   Object.values(segMarkers).forEach(function(m) {
     if (m._segData && (m._segData.stato === 'APERTO' || m._segData.stato === 'PRESO_IN_CARICO')) {
-      if (!_statsZona || m._segData.zona === _statsZona) {
+      if (_statsZona === 'tutti' || m._segData.zona === _statsZona) {
         activeCount++;
       }
     }
