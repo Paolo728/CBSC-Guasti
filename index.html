@@ -2484,11 +2484,13 @@ function renderStats(docs, allSegs, annoSel) {
   var totMese = isCurrentYear ? segsMese.length : 0;
   var risolte = segsAnno.filter(function(r) { return r.stato === 'RISOLTO'; }).length;
 
-  // Aperte ora — sempre live dalla mappa (solo anno corrente)
+  // Aperte ora — live dalla mappa, filtrato per zona se selezionata
   var activeCount = 0;
   Object.values(segMarkers).forEach(function(m) {
     if (m._segData && (m._segData.stato === 'APERTO' || m._segData.stato === 'PRESO_IN_CARICO')) {
-      activeCount++;
+      if (!_statsZona || m._segData.zona === _statsZona) {
+        activeCount++;
+      }
     }
   });
 
