@@ -2045,6 +2045,9 @@ async function risolviSegnalazione(id) {
       var seg = m._segData;
       var statoBadge = '<span style="background:#3fb95022;color:#3fb950;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #3fb950">RISOLTO</span>';
       var prioBadge  = '<span style="background:#e63946;color:white;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">' + (seg.priorita||'') + '</span>';
+      var fotoRisoltaId = 'foto-seg-' + id;
+      var fotoRisoltaHtml = '<div id="' + fotoRisoltaId + '" style="margin-top:8px;padding-top:8px;border-top:1px solid #30363d">' +
+        (seg.foto_links ? buildFotoPopupHtml(seg.foto_links) : buildFotoIconaGrigia()) + '</div>';
       m.setPopupContent(
         '<div style="font-family:Barlow,sans-serif;font-size:13px;padding:4px;min-width:200px">' +
         '<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:#58a6ff;margin-bottom:6px">' + (seg.codice||'N/D') + '</div>' +
@@ -2054,6 +2057,7 @@ async function risolviSegnalazione(id) {
         '<div style="color:#8b949e;font-size:11px;margin-bottom:6px">' + seg.timestamp_display + '</div>' +
         '<div style="color:#3fb950;font-size:12px;margin-top:4px">✓ Chiuso da: <strong>' + chiusoDa + '</strong></div>' +
         '<div style="color:#8b949e;font-size:11px">' + chiusoIl + '</div>' +
+        fotoRisoltaHtml +
         '</div>'
       );
       clusterGroup.refreshClusters(m);
