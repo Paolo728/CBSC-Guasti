@@ -4255,7 +4255,7 @@ function findNearestRete(lat, lng) {
       }
     });
   });
-  return minD < 0.00015 ? nearest : null;
+  return minD < 0.00005 ? nearest : null; // ~5 metri di tolleranza
 }
 function toggleTipoMenu() {
   var menu = document.getElementById('rete-tipo-menu');
