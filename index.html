@@ -1528,11 +1528,10 @@ const ZONE_LABELS = {
 const USERS_FALLBACK = {
   // Utenti caricati da Firestore — nessuna password nel codice sorgente
 };
-const PIN_FALLBACK = '1708';
-
-var USERS = Object.assign({}, USERS_FALLBACK);
-var PIN_CHIUSURA = PIN_FALLBACK;
-var PIN_CARICO   = PIN_FALLBACK;
+// PIN e utenti caricati esclusivamente da Firestore — nessun fallback nel codice
+var USERS = {};
+var PIN_CHIUSURA = '';
+var PIN_CARICO   = '';
 
 // Carica config da Firestore all'avvio
 async function loadConfigFromFirestore() {
@@ -1566,10 +1565,10 @@ async function loadConfigFromFirestore() {
     }
 
   } catch(e) {
-    console.warn('Uso configurazione locale (fallback):', e.message);
-    USERS = Object.assign({}, USERS_FALLBACK);
-    PIN_CHIUSURA = PIN_FALLBACK;
-    PIN_CARICO   = PIN_FALLBACK;
+    console.error('Errore caricamento config da Firestore:', e.message);
+    USERS = {};
+    PIN_CHIUSURA = '';
+    PIN_CARICO   = '';
   }
 }
 
