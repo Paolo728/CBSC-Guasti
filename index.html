@@ -1962,27 +1962,24 @@ async function inviaForm() {
     });
   });
 
-  Promise.all(fotoPromises).then(function(fotosB64) {
+  try {
+    var fotosB64 = await Promise.all(fotoPromises);
     seg.foto = fotosB64;
-    return Promise.all([
-      saveToFirebase(seg),
-      sendTelegram(seg),
-    ]);
-  }).then(function(results) {
+    var results = await Promise.all([saveToFirebase(seg), sendTelegram(seg)]);
     var fbId = results[0];
     seg.id = fbId;
-    // Manda a Sheets (che invia anche la mail)
-    sendToSheets(seg).catch(function(e) { console.warn('Sheets webhook error:', e); });
     document.getElementById('sending-overlay').classList.remove('show');
     showSuccess(seg);
     addMarkerToMap(seg);
     updateSegCount();
-  }).catch(function(err) {
+    // Manda a Sheets e aspetta la risposta per scrivere i foto_links su Firebase
+    await sendToSheets(seg);
+  } catch(err) {
     document.getElementById('sending-overlay').classList.remove('show');
     document.getElementById('btn-send').classList.remove('loading');
     showToast('Errore invio: ' + err.message, 'error');
     console.error(err);
-  });
+  }
 }
 
 // ── GENERAZIONE CODICE INTERVENTO ──
