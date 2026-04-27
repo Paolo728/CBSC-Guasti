@@ -1,6 +1,6 @@
 {
-  "name": "CBSC Segnalazioni Guasti",
-  "short_name": "CBSC Guasti",
+  "name": "CBSC Segnalazioni",
+  "short_name": "CBSC",
   "description": "Segnalazione guasti rete idrica — Consorzio di Bonifica della Sardegna Centrale",
   "start_url": "/CBSC-Guasti/",
   "scope": "/CBSC-Guasti/",
