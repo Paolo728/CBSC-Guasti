@@ -4237,22 +4237,74 @@ function injectReteInfo(lat, lng) {
   if (fb) fb.insertBefore(box, fb.firstChild);
 }
 
-function findNearestRete(lat, lng) {
-  var nearest = null, minD = Infinity;
-  Object.keys(reteLayerGroups).forEach(function(t) {
-    if (t === 'idranti') return;
-    reteLayerGroups[t].eachLayer(function(l) {
-      var ll = l.getLatLng ? l.getLatLng() : (l.getBounds ? l.getBounds().getCenter() : null);
-      if (!ll) return;
-      var d = Math.pow(ll.lat - lat, 2) + Math.pow(ll.lng - lng, 2);
-      if (d < minD) {
-        minD = d;
-        // Usa i dati salvati sul layer se disponibili
-        nearest = l._reteData || { tipo:RETE_LAYERS[t]?RETE_LAYERS[t].label:t, nome:'---', table:t };
+// Calcola distanza al quadrato dal punto P al segmento AB (coordinate lat/lng)
+function distPuntoSegmento(px, py, ax, ay, bx, by) {
+  var dx = bx - ax, dy = by - ay;
+  var lenSq = dx*dx + dy*dy;
+  if (lenSq === 0) return Math.pow(px-ax,2) + Math.pow(py-ay,2);
+  var t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / lenSq));
+  return Math.pow(px - (ax + t*dx), 2) + Math.pow(py - (ay + t*dy), 2);
+}
+
+// Calcola distanza minima dal punto a una polyline GeoJSON
+function distPolyline(lat, lng, layer) {
+  var minD = Infinity;
+  layer.eachLayer(function(sub) {
+    // GeoJSON può avere più livelli
+    var geom = sub.feature && sub.feature.geometry;
+    if (!geom) {
+      // Prova con getLatLngs per polyline Leaflet normali
+      if (sub.getLatLngs) {
+        var lls = sub.getLatLngs();
+        // Appiattisci array annidati
+        var pts = Array.isArray(lls[0]) ? lls.reduce(function(a,b){return a.concat(b);}, []) : lls;
+        for (var i = 0; i < pts.length - 1; i++) {
+          var d = distPuntoSegmento(lat, lng, pts[i].lat, pts[i].lng, pts[i+1].lat, pts[i+1].lng);
+          if (d < minD) minD = d;
+        }
+      }
+      return;
+    }
+    var coords = geom.coordinates;
+    // LineString o MultiLineString
+    var lines = geom.type === 'MultiLineString' ? coords : [coords];
+    lines.forEach(function(line) {
+      for (var i = 0; i < line.length - 1; i++) {
+        // GeoJSON usa [lng, lat]
+        var d = distPuntoSegmento(lat, lng, line[i][1], line[i][0], line[i+1][1], line[i+1][0]);
+        if (d < minD) minD = d;
       }
     });
   });
-  return minD < 0.000005 ? nearest : null; // ~0.5 metri — solo click praticamente sulla linea
+  return minD;
+}
+
+function findNearestRete(lat, lng) {
+  var nearest = null, minD = Infinity;
+  // Soglia: ~3 metri in gradi (dipende dalla latitudine, a 40° ~0.000027 per 3m)
+  var SOGLIA = 0.000001; // ~1 metro — solo click molto preciso sulla linea
+  Object.keys(reteLayerGroups).forEach(function(t) {
+    if (t === 'idranti') return;
+    reteLayerGroups[t].eachLayer(function(l) {
+      if (!l._reteData) return;
+      var d;
+      // GeoJSON layer (condotte)
+      if (l.eachLayer) {
+        d = distPolyline(lat, lng, l);
+      } else if (l.getLatLng) {
+        // Marker puntuale
+        var ll = l.getLatLng();
+        d = Math.pow(ll.lat - lat, 2) + Math.pow(ll.lng - lng, 2);
+      } else {
+        return;
+      }
+      if (d < minD) {
+        minD = d;
+        nearest = l._reteData;
+      }
+    });
+  });
+  return minD < SOGLIA ? nearest : null;
 }
 function toggleTipoMenu() {
   var menu = document.getElementById('rete-tipo-menu');
