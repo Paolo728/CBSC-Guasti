@@ -4252,7 +4252,7 @@ function findNearestRete(lat, lng) {
       }
     });
   });
-  return minD < 0.000015 ? nearest : null; // ~1.5 metri — solo click diretto sulla linea
+  return minD < 0.000005 ? nearest : null; // ~0.5 metri — solo click praticamente sulla linea
 }
 function toggleTipoMenu() {
   var menu = document.getElementById('rete-tipo-menu');
